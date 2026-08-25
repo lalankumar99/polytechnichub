@@ -7,6 +7,7 @@ export const AdminPremiumManager: React.FC = () => {
   const [courses, setCourses] = useState<PremiumCourse[]>([]);
   const [requests, setRequests] = useState<PremiumAccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'courses' | 'requests'>('courses');
 
   // Course Modal
@@ -53,6 +54,7 @@ export const AdminPremiumManager: React.FC = () => {
 
   const handleCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
       if (editingCourse) {
         await api.updatePremiumCourse(editingCourse.id, formData);
@@ -61,8 +63,11 @@ export const AdminPremiumManager: React.FC = () => {
       }
       setShowCourseModal(false);
       loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert('Failed to save course: ' + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -306,9 +311,13 @@ export const AdminPremiumManager: React.FC = () => {
               </div>
               <div className="pt-4 flex justify-end space-x-3">
                 <button type="button" onClick={() => setShowCourseModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
-                <button type="submit" className="px-6 py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 transition-colors flex items-center shadow-md">
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Course
+                <button type="submit" disabled={isSaving} className="px-6 py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-400 text-slate-900 transition-colors flex items-center shadow-md disabled:opacity-50">
+                  {isSaving ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-900 mr-2"></div>
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  {isSaving ? 'Saving...' : 'Save Course'}
                 </button>
               </div>
             </form>

@@ -42,7 +42,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   items,
   onOpenPremiumCourse
 }) => {
-  const { isInstallable, promptInstall, showManualInstructions, closeManualInstructions, deviceType } = usePWAInstall();
+  const { isInstallable, promptInstall } = usePWAInstall();
   // Recent published files
   const recentFiles = items
     .filter(i => i.type !== 'folder' && i.status === 'published')
@@ -471,63 +471,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-
-
-
-      {/* Install Instructions Modal */}
-      {showManualInstructions && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeManualInstructions}></div>
-          <div className="relative bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Install PolyHub</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              To install this app on your device for offline access and a full-screen experience:
-            </p>
-            <ul className="space-y-3 mb-6">
-              {deviceType === 'ios' ? (
-                <>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">1</span>
-                    <span>Tap the <strong>Share</strong> button at the bottom of your Safari browser.</span>
-                  </li>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">2</span>
-                    <span>Scroll down and select <strong>Add to Home Screen</strong>.</span>
-                  </li>
-                </>
-              ) : deviceType === 'desktop' ? (
-                <>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">1</span>
-                    <span>Look for the <strong>Install</strong> icon (a screen with a down arrow) in your browser's address bar.</span>
-                  </li>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">2</span>
-                    <span>Or, click the browser menu (⋮) and select <strong>Install App</strong> or <strong>Add to Home screen</strong>.</span>
-                  </li>
-                </>
-              ) : (
-                <>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">1</span>
-                    <span>Click the browser menu (⋮) in the top right.</span>
-                  </li>
-                  <li className="flex items-start space-x-3 text-sm text-slate-700">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">2</span>
-                    <span>Select <strong>Install App</strong> or <strong>Add to Home screen</strong>.</span>
-                  </li>
-                </>
-              )}
-            </ul>
-            <button 
-              onClick={closeManualInstructions}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-sm transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

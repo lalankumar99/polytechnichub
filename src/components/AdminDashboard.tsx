@@ -123,16 +123,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newFolderDesc, setNewFolderDesc] = useState('');
   const [newFolderBranch, setNewFolderBranch] = useState('Computer Science');
   const [newFolderSemester, setNewFolderSemester] = useState('Semester 1');
+  const [newFolderAccessType, setNewFolderAccessType] = useState<"free"|"premium"|"both">("both");
+  const [newFolderIsPremium, setNewFolderIsPremium] = useState(false);
 
   const [uploadFileObj, setUploadFileObj] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'published' | 'draft'>('published');
   const [uploadDesc, setUploadDesc] = useState('');
+  const [uploadAccessType, setUploadAccessType] = useState<"free"|"premium"|"both">("both");
+  const [uploadIsPremium, setUploadIsPremium] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const [htmlNoteName, setHtmlNoteName] = useState('');
   const [htmlNoteContent, setHtmlNoteContent] = useState('');
   const [htmlNoteStatus, setHtmlNoteStatus] = useState<'published' | 'draft'>('published');
   const [htmlNoteDesc, setHtmlNoteDesc] = useState('');
+  const [htmlNoteAccessType, setHtmlNoteAccessType] = useState<"free"|"premium"|"both">("both");
+  const [htmlNoteIsPremium, setHtmlNoteIsPremium] = useState(false);
 
   const [renameValue, setRenameValue] = useState('');
   const [renameUrlValue, setRenameUrlValue] = useState('');
@@ -279,10 +285,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!newFolderName.trim()) return;
 
     try {
-      await api.createFolder(newFolderName.trim(), currentFolderId, newFolderStatus, newFolderDesc, newFolderBranch, newFolderSemester);
+      await api.createFolder(newFolderName.trim(), currentFolderId, newFolderStatus, newFolderDesc, newFolderBranch, newFolderSemester, newFolderAccessType === "premium", newFolderAccessType);
       setShowNewFolderModal(false);
       setNewFolderName('');
       setNewFolderDesc('');
+      setNewFolderIsPremium(false);
+      setNewFolderAccessType("both");
       triggerSuccess(`Folder "${newFolderName}" created successfully.`);
       await loadAdminData();
     } catch (err: any) {
@@ -321,6 +329,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setShowUploadModal(false);
       setUploadFileObj(null);
       setUploadDesc('');
+      setUploadIsPremium(false);
+      setUploadAccessType("both");
       triggerSuccess(`File "${uploadFileObj.name}" uploaded successfully (${uploadStatus}).`);
       await loadAdminData();
     } catch (err: any) {
@@ -369,6 +379,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setHtmlNoteName('');
       setHtmlNoteContent('');
       setHtmlNoteDesc('');
+      setHtmlNoteIsPremium(false);
+      setHtmlNoteAccessType("both");
       triggerSuccess(`Interactive note "${htmlNoteName}" created successfully.`);
       await loadAdminData();
     } catch (err: any) {
@@ -432,19 +444,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await loadAdminData();
     } catch (err: any) {
       setError(err.message || 'Delete failed');
-    }
-  };
-
-  const handleResetDemoData = async () => {
-    if (!window.confirm('Reset all folders and notes to the standard Polytechnic sample curriculum? Any custom uploads will be replaced.')) {
-      return;
-    }
-    try {
-      await api.resetDemo();
-      triggerSuccess('Curriculum reset to default Polytechnic seed.');
-      await loadAdminData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset data');
     }
   };
 
@@ -548,21 +547,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-2.5">
-          <button
-            id="admin-reset-demo-btn"
-            onClick={handleResetDemoData}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center space-x-1.5"
-            title="Reset library to default demo dataset"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset Demo Curriculum</span>
-          </button>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-teal-200 bg-teal-50/40 shadow-sm">
-          <span className="text-xs text-teal-700 font-semibold block">External Links</span>
-          <span className="text-2xl font-black text-teal-700 font-mono mt-1 block">{stats?.totalLinks ?? 0}</span>
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm hidden">
+          <span className="text-xs text-slate-400 font-semibold block">External Links</span>
+          <span className="text-2xl font-black text-slate-200 font-mono mt-1 block">{stats?.totalLinks ?? 0}</span>
         </div>
       </div>
 
@@ -978,6 +965,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* ========================================================================= */}
       
       
+      
+      {/* ========================================================================= */}
+      {/* UPLOAD FILE MODAL */}
+      {/* ========================================================================= */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Upload File</h3>
+              </div>
+              <button 
+                onClick={() => setShowUploadModal(false)}
+                className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-500">
+              Uploading to: <strong>{currentFolder ? currentFolder.name : 'Root Library'}</strong>
+            </p>
+
+            <form onSubmit={handleUploadFile} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Select File (PDF, HTML, etc)</label>
+                <input 
+                  type="file" 
+                  onChange={(e) => setUploadFileObj(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                <input 
+                  type="text" 
+                  value={uploadDesc}
+                  onChange={(e) => setUploadDesc(e.target.value)}
+                  placeholder="e.g. 2023 Previous Year Paper"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Initial Visibility</label>
+                <select 
+                  value={uploadStatus}
+                  onChange={(e) => setUploadStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                >
+                  <option value="published">Published</option>
+                  <option value="draft">Draft (Hidden)</option>
+                </select>
+              </div>
+
+              <div className="mt-4 mb-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">Target Audience</label>
+                <select value={uploadAccessType} onChange={e => setUploadAccessType(e.target.value as any)} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 focus:bg-white text-sm">
+                  <option value="both">Both (Free & Premium Users)</option>
+                  <option value="free">Free Users Only</option>
+                  <option value="premium">Premium Users Only (Requires Registration)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading || !uploadFileObj}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <span>Upload File</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* ADD LINK MODAL */}
       {/* ========================================================================= */}

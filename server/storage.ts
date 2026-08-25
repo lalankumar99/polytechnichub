@@ -138,11 +138,15 @@ class LibraryStorage {
     description?: string;
     branch?: string;
     semester?: string;
+    isPremium?: boolean;
+    accessType?: "free" | "premium" | "both";
   }): Promise<StudyItem> {
     const items = await this.getItems();
     let branch: string = data.branch || 'General';
     let semester: string = data.semester || 'All Semesters';
     let subject: string | undefined;
+    let isPremium = data.isPremium || false;
+    let accessType = data.accessType || "both";
 
     if (data.parentId) {
       const parent = items.find(p => p.id === data.parentId);
@@ -150,6 +154,9 @@ class LibraryStorage {
         if (!data.branch && parent.branch) branch = parent.branch;
         if (!data.semester && parent.semester) semester = parent.semester;
         subject = parent.subject;
+        if (parent.isPremium) isPremium = true;
+        if (parent.accessType) accessType = parent.accessType;
+        if (parent.isPremium) isPremium = true;
       }
     }
 
@@ -164,6 +171,8 @@ class LibraryStorage {
       semester,
       subject,
       description: data.description,
+      isPremium,
+      accessType,
       downloadsCount: 0,
       viewsCount: 0,
       createdAt: new Date().toISOString(),
@@ -185,12 +194,16 @@ class LibraryStorage {
     description?: string;
     branch?: string;
     semester?: string;
+    isPremium?: boolean;
+    accessType?: "free" | "premium" | "both";
   }): Promise<StudyItem> {
     const items = await this.getItems();
     let branch: string = data.branch || 'General';
     let semester: string = data.semester || 'All Semesters';
     let subject: string | undefined;
     let unit: string | undefined;
+    let isPremium = data.isPremium || false;
+    let accessType = data.accessType || "both";
 
     if (data.parentId) {
       const parent = items.find(p => p.id === data.parentId);
@@ -199,6 +212,7 @@ class LibraryStorage {
         if (!data.semester && parent.semester) semester = parent.semester;
         subject = parent.subject;
         unit = parent.unit;
+        if (parent.isPremium) isPremium = true;
       }
     }
 
@@ -211,6 +225,8 @@ class LibraryStorage {
       size: data.size || 0,
       fileUrl: data.fileUrl,
       content: data.content,
+      isPremium,
+      accessType,
       branch,
       semester,
       subject,
@@ -345,6 +361,50 @@ class LibraryStorage {
       throw err;
     }
   }
+
+  
+
+  // Premium Users
+  private premiumUsersPath = 'premium_users';
+
+  public async getPremiumUsers(): Promise<any[]> {
+    const snapshot = await getDocs(collection(db, this.premiumUsersPath));
+    return snapshot.docs.map(doc => doc.data()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public async getPremiumUser(id: string): Promise<any | null> {
+    const docRef = doc(db, this.premiumUsersPath, id);
+    const snapshot = await getDoc(docRef);
+    return snapshot.exists() ? snapshot.data() : null;
+  }
+
+  public async getPremiumUserByEmailOrMobile(identifier: string): Promise<any | null> {
+    const users = await this.getPremiumUsers();
+    return users.find(u => u.email === identifier || u.mobile === identifier || u.id === identifier) || null;
+  }
+
+  public async createPremiumUser(data: any): Promise<any> {
+    const newId = 'req-' + Date.now().toString() + Math.random().toString(36).substring(2, 7);
+    const user = {
+      ...data,
+      internalId: newId,
+      id: '', // Will be assigned by admin
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, this.premiumUsersPath, newId), cleanUndefined(user));
+    return user;
+  }
+
+  public async updatePremiumUser(internalId: string, updates: any): Promise<void> {
+    const docRef = doc(db, this.premiumUsersPath, internalId);
+    await updateDoc(docRef, cleanUndefined(updates));
+  }
+
+  public async deletePremiumUser(internalId: string): Promise<void> {
+    await deleteDoc(doc(db, this.premiumUsersPath, internalId));
+  }
+
 
   // Premium Courses
   public async getPremiumCourses(): Promise<PremiumCourse[]> {

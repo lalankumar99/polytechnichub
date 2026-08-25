@@ -1,27 +1,9 @@
 const fs = require('fs');
 let content = fs.readFileSync('server/storage.ts', 'utf-8');
 
-const regex = /}\s*}\s*const UPLOADS_DIR = path\.join\(process\.cwd\(\), 'uploads'\);\s*if \(\!fs\.existsSync\(UPLOADS_DIR\)\) {\s*fs\.mkdirSync\(UPLOADS_DIR, { recursive: true }\);\s*}\s*export const UPLOADS_PATH = UPLOADS_DIR;\s*/;
+// deduplicate accessType declarations
+content = content.replace(/(\s*accessType\?: "free" \| "premium" \| "both";)+/g, '\n    accessType?: "free" | "premium" | "both";');
+content = content.replace(/(\s*let accessType = data\.accessType \|\| "both";)+/g, '\n    let accessType = data.accessType || "both";');
+content = content.replace(/(\s*if \(parent\.accessType\) accessType = parent\.accessType;)+/g, '\n        if (parent.accessType) accessType = parent.accessType;');
 
-const match = content.match(regex);
-if (match) {
-    // We want to extract this UPLOADS_DIR part and move it to the very end of the file.
-    // And remove the `}` that closes the class, placing it at the end instead.
-    let uploadsCode = `
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-export const UPLOADS_PATH = UPLOADS_DIR;
-`;
-    
-    let newContent = content.replace(match[0], "\n"); // removes the closing braces and uploads code
-    
-    // Now append the class closing brace and the uploads code
-    newContent += `\n}\n${uploadsCode}`;
-    
-    fs.writeFileSync('server/storage.ts', newContent);
-    console.log("Storage fixed");
-} else {
-    console.log("Regex didn't match");
-}
+fs.writeFileSync('server/storage.ts', content);

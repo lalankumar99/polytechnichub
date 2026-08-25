@@ -1,32 +1,25 @@
 const fs = require('fs');
 let content = fs.readFileSync('src/components/HomePage.tsx', 'utf-8');
 
-const target = `<button
-              onClick={onOpenSearch}
-              className="px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-cyan-500 hover:bg-slate-800/80 text-white font-bold transition-all flex items-center space-x-2 w-full sm:w-auto justify-center"
+const browseButton = `<button
+              id="hero-browse-btn"
+              onClick={() => onNavigateBrowse(null)}
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <Search className="w-5 h-5 text-cyan-400" />
-              <span>Search Notes & PDFs</span>
+              <FolderTree className="w-4 h-4" />
+              <span>Browse Notes</span>
+              <ArrowRight className="w-4 h-4" />
             </button>`;
 
-const replacement = `<button
-              onClick={onOpenSearch}
-              className="px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-cyan-500 hover:bg-slate-800/80 text-white font-bold transition-all flex items-center space-x-2 w-full sm:w-auto justify-center"
+const premiumButton = `<button
+              onClick={() => onOpenPremiumCourse && onOpenPremiumCourse()}
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <Search className="w-5 h-5 text-cyan-400" />
-              <span>Search Notes & PDFs</span>
-            </button>
+              <Sparkles className="w-4 h-4" />
+              <span>Premium Access</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>`;
 
-            {isInstallable && (
-              <button
-                onClick={promptInstall}
-                className="px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-cyan-500 hover:bg-slate-800/80 text-white font-bold transition-all flex items-center space-x-2 w-full sm:w-auto justify-center"
-              >
-                <Download className="w-5 h-5 text-cyan-400" />
-                <span>Install App</span>
-              </button>
-            )}`;
-
-content = content.replace(target, replacement);
+content = content.replace(browseButton, browseButton + '\n            ' + premiumButton);
 
 fs.writeFileSync('src/components/HomePage.tsx', content);

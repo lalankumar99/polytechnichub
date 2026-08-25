@@ -2,6 +2,8 @@ export type ItemType = 'folder' | 'pdf' | 'html' | 'youtube' | 'link';
 export type ItemStatus = 'published' | 'draft' | 'unpublished';
 
 export interface StudyItem {
+  isPremium?: boolean;
+  accessType?: 'free' | 'premium' | 'both';
   id: string;
   name: string;
   type: ItemType;
@@ -101,5 +103,15 @@ export interface FeedbackSubmission {
   email: string;
   mobile: string;
   suggestion: string;
+  createdAt: string;
+}
+
+export interface PremiumUser {
+  id: string; // The ID assigned by Admin
+  name: string;
+  email: string;
+  mobile: string;
+  password?: string; // Stored plain or simple hash for this context, since requirements say admin sees it or it's just login
+  status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }

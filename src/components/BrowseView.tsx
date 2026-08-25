@@ -309,7 +309,7 @@ export const BrowseView: React.FC<BrowseViewProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors truncate">
-                        {folder.name}
+                        {folder.name} {folder.isPremium && <span className="ml-1 inline-flex items-center text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase"><svg className="w-3 h-3 mr-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Premium</span>}
                       </h3>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {folder.itemCount !== undefined ? `${folder.itemCount} items` : 'Open folder'}
@@ -334,8 +334,8 @@ export const BrowseView: React.FC<BrowseViewProps> = ({
                       <Folder className="w-4 h-4 fill-blue-500/20 text-blue-600" />
                     </div>
                     <div className="min-w-0">
-                      <span className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-blue-600 truncate block">
-                        {folder.name}
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-blue-600 truncate flex items-center gap-2">
+                        {folder.name} {folder.isPremium && <span className="inline-flex items-center text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase"><svg className="w-3 h-3 mr-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Premium</span>}
                       </span>
                     </div>
                   </div>

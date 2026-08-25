@@ -223,14 +223,14 @@ export const api = {
     return { items: data.items, stats: data.stats };
   },
 
-  async createFolder(name: string, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, branch?: string, semester?: string): Promise<StudyItem> {
+  async createFolder(name: string, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, branch?: string, semester?: string, isPremium?: boolean, accessType: 'free' | 'premium' | 'both' = 'both'): Promise<StudyItem> {
     const res = await fetch(`${API_BASE}/admin/folders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ name, parentId, status, description, branch, semester })
+      body: JSON.stringify({ name, parentId, status, description, branch, semester, isPremium, accessType })
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create folder');
@@ -251,12 +251,13 @@ export const api = {
     return data.file;
   },
 
-  async uploadFile(file: File, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string): Promise<StudyItem> {
+  async uploadFile(file: File, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, isPremium?: boolean): Promise<StudyItem> {
     const formData = new FormData();
     formData.append('file', file);
     if (parentId) formData.append('parentId', parentId);
     formData.append('status', status);
     if (description) formData.append('description', description);
+    if (isPremium !== undefined) formData.append('isPremium', isPremium.toString());
 
     const res = await fetch(`${API_BASE}/admin/upload`, {
       method: 'POST',
@@ -306,16 +307,6 @@ export const api = {
     return { deletedIds: data.deletedIds, count: data.count };
   },
 
-  async resetDemo(): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/admin/reset-demo`, {
-      method: 'POST',
-      headers: getAuthHeaders()
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Failed to reset demo data');
-    return data.items;
-  },
-
   async getStudiverseData(): Promise<{ liveEmbed: string, videos: any[] }> {
     const res = await fetch(`${API_BASE}/studiverse`);
     const data = await res.json();
@@ -341,5 +332,48 @@ export const api = {
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to update videos');
+  },
+
+  // Premium User Management
+  async registerPremiumUser(data: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium-users/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  async loginPremiumUser(data: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium-users/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  async getAdminPremiumUsers(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/admin/premium-users`, {
+      headers: getAuthHeaders()
+    });
+    const data = await res.json();
+    return data.users || [];
+  },
+  async updateAdminPremiumUser(id: string, data: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/admin/premium-users/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  async deleteAdminPremiumUser(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/admin/premium-users/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return res.json();
   }
 };

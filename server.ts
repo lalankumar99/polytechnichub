@@ -209,7 +209,7 @@ app.get('/api/admin/tree', adminAuthMiddleware, async (req, res) => {
 // 2. Create new folder (supports unlimited nesting)
 app.post('/api/admin/folders', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, parentId, status, description, branch, semester } = req.body;
+    const { name, parentId, status, description, branch, semester, isPremium, accessType } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, error: 'Folder name is required' });
     }
@@ -220,7 +220,9 @@ app.post('/api/admin/folders', adminAuthMiddleware, async (req, res) => {
       status: status || 'published',
       description,
       branch,
-      semester
+      semester,
+      isPremium,
+      accessType
     });
 
     res.json({ success: true, folder });
@@ -232,7 +234,7 @@ app.post('/api/admin/folders', adminAuthMiddleware, async (req, res) => {
 // 3. Create File Record (bypassing local disk multer)
 app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, type, parentId, status, size, fileUrl, description, branch, semester } = req.body;
+    const { name, type, parentId, status, size, fileUrl, description, branch, semester, isPremium } = req.body;
     
     if (!name || !type || !fileUrl) {
       return res.status(400).json({ success: false, error: 'Name, type, and fileUrl are required' });
@@ -247,7 +249,8 @@ app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) 
       fileUrl,
       description,
       branch,
-      semester
+      semester,
+      isPremium
     });
     res.json({ success: true, file: fileItem });
   } catch (err: any) {
@@ -258,7 +261,7 @@ app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) 
 // 3. Upload file (PDF or HTML)
 app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async (req, res) => {
   try {
-    const { parentId, status, description } = req.body;
+    const { parentId, status, description, isPremium, accessType } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -285,7 +288,9 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async 
       size: req.file.size,
       fileUrl: `/uploads/${req.file.filename}`,
       content,
-      description
+      description,
+      isPremium: isPremium === "true" || isPremium === true,
+      accessType
     });
 
     res.json({ success: true, file: fileItem });
@@ -297,7 +302,7 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async 
 // 4. Create HTML Note directly from text/markdown/HTML editor
 app.post('/api/admin/create-html-note', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, parentId, status, content, description, branch, semester } = req.body;
+    const { name, parentId, status, content, description, branch, semester, isPremium, accessType } = req.body;
     if (!name || !content) {
       return res.status(400).json({ success: false, error: 'Name and content are required' });
     }
@@ -314,7 +319,9 @@ app.post('/api/admin/create-html-note', adminAuthMiddleware, async (req, res) =>
       content,
       description,
       branch,
-      semester
+      semester,
+      isPremium,
+      accessType
     });
 
     res.json({ success: true, file: fileItem });
@@ -326,13 +333,14 @@ app.post('/api/admin/create-html-note', adminAuthMiddleware, async (req, res) =>
 // 5. Update item (rename, publish/unpublish/draft, move to folder)
 app.put('/api/admin/items/:id', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, status, parentId, description } = req.body;
+    const { name, status, parentId, description, isPremium } = req.body;
     const updates: any = {};
 
     if (name !== undefined) updates.name = name.trim();
     if (status !== undefined) updates.status = status;
     if (parentId !== undefined) updates.parentId = parentId === '' ? null : parentId;
     if (description !== undefined) updates.description = description;
+    if (isPremium !== undefined) updates.isPremium = isPremium;
 
     const updated = await storage.updateItem(req.params.id, updates);
     res.json({ success: true, item: updated });
@@ -379,21 +387,87 @@ app.post('/api/feedback', async (req, res) => {
 });
 
 
-app.post('/api/admin/reset-demo', adminAuthMiddleware, async (req, res) => {
-  try {
-    // const items = await storage.resetToDefault();
-    res.json({ success: true, message: 'Polytechnic curriculum reset is disabled for production', items: [] });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // Serve static uploads
 app.use('/uploads', express.static(UPLOADS_PATH));
 
 // ----------------------------------------------------
 // VITE INTEGRATION & SERVER START
 // ----------------------------------------------------
+
+
+
+// Premium Users Endpoints
+app.post('/api/premium-users/register', async (req, res) => {
+  try {
+    const { name, email, mobile, password } = req.body;
+    if (!name || !email || !mobile || !password) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    const existing = await storage.getPremiumUserByEmailOrMobile(email);
+    const existing2 = await storage.getPremiumUserByEmailOrMobile(mobile);
+    if (existing || existing2) {
+      return res.status(400).json({ success: false, error: 'Email or Mobile already registered' });
+    }
+    const user = await storage.createPremiumUser({ name, email, mobile, password });
+    res.json({ success: true, user });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/premium-users/login', async (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, error: 'ID and Password are required' });
+    }
+    const user = await storage.getPremiumUserByEmailOrMobile(identifier);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid ID or Password' });
+    }
+    if (user.password !== password) {
+      return res.status(401).json({ success: false, error: 'Invalid ID or Password' });
+    }
+    if (user.status === 'pending') {
+      return res.status(403).json({ success: false, error: 'Account pending approval from admin' });
+    }
+    if (user.status === 'rejected') {
+      return res.status(403).json({ success: false, error: 'Account access has been revoked' });
+    }
+    // We omit real JWT for simplicity, returning user object is enough for frontend persistence here
+    res.json({ success: true, user: { id: user.id, internalId: user.internalId, name: user.name, email: user.email, mobile: user.mobile } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/premium-users', adminAuthMiddleware, async (req, res) => {
+  try {
+    const users = await storage.getPremiumUsers();
+    res.json({ success: true, users });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/admin/premium-users/:internalId', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { status, id } = req.body;
+    await storage.updatePremiumUser(req.params.internalId, { status, id });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/admin/premium-users/:internalId', adminAuthMiddleware, async (req, res) => {
+  try {
+    await storage.deletePremiumUser(req.params.internalId);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 // ----------------------------------------------------

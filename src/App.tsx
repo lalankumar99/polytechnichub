@@ -1,5 +1,5 @@
-import { PremiumCourseView } from './components/PremiumCourseView';
-import React, { useState, useEffect, useCallback } from 'react';
+import { PremiumPortal } from './components/PremiumPortal';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomePage } from './components/HomePage';
@@ -35,7 +35,8 @@ export default function App() {
   // Viewer & Requirement Flow
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
-  const [selectedPremiumCourse, setSelectedPremiumCourse] = useState<any | null>(null);
+  const [showPremiumPortal, setShowPremiumPortal] = useState(false);
+  const [premiumUser, setPremiumUser] = useState<any>(null);
   const [initialFullscreenPref, setInitialFullscreenPref] = useState<boolean>(false);
 
   
@@ -95,13 +96,18 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOpenPremiumCourse = (course: any) => {
-    setSelectedPremiumCourse(course);
-    setCurrentView('premium');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleOpenPremiumCourse = () => {
+    setShowPremiumPortal(true);
   };
 
   const handleOpenFolder = (folderId: string) => {
+    const folder = publicItems.find(i => i.id === folderId);
+    if (folder?.isPremium) {
+      if (!premiumUser || premiumUser.status !== 'approved') {
+        setShowPremiumPortal(true);
+        return;
+      }
+    }
     setCurrentView('browse');
     setCurrentFolderId(folderId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -109,6 +115,12 @@ export default function App() {
 
   // When student clicks any PDF or HTML note -> trigger Requirement Screen
   const handleInitiateOpenFile = (file: StudyItem) => {
+    if (file.isPremium) {
+      if (!premiumUser || premiumUser.status !== 'approved') {
+        setShowPremiumPortal(true);
+        return;
+      }
+    }
     setSelectedFileForRequirement(file);
   };
 
@@ -134,6 +146,23 @@ export default function App() {
     }
   };
 
+  
+  const isPremiumActive = premiumUser && premiumUser.status === 'approved';
+  
+  const filteredItems = useMemo(() => {
+    if (adminUser) return publicItems; // Admin sees all
+    
+    return publicItems.filter(item => {
+      // If marked as premium only, hide from non-premium users
+      if (item.accessType === 'premium' || item.isPremium) {
+        return isPremiumActive;
+      }
+      // If marked as free only, hide from premium users (based on some interpretations, but user said "Jo free wala hai vah bhi dikhna chahie premium lene wala ko", meaning premium sees free content. So we don't hide free content from premium.)
+      // Therefore, if it's 'free' or 'both', it's visible to everyone.
+      return true;
+    });
+  }, [publicItems, premiumUser, adminUser]);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-cyan-500/30 selection:text-slate-900">
       
@@ -156,7 +185,7 @@ export default function App() {
             onOpenFile={handleInitiateOpenFile}
             onOpenPremiumCourse={handleOpenPremiumCourse}
             stats={publicStats}
-            items={publicItems}
+            items={filteredItems}
           />
         )}
 
@@ -166,7 +195,7 @@ export default function App() {
         {currentView === 'browse' && (
           <BrowseView
             currentFolderId={currentFolderId}
-            items={publicItems}
+            items={filteredItems}
             onOpenFolder={handleOpenFolder}
             onNavigateBreadcrumb={(fId) => setCurrentFolderId(fId)}
             onOpenFile={handleInitiateOpenFile}
@@ -181,14 +210,6 @@ export default function App() {
           />
         )}
       
-        {currentView === 'premium' && selectedPremiumCourse && (
-          <PremiumCourseView 
-            course={selectedPremiumCourse} 
-            user={studentUser} 
-            onBack={() => setCurrentView('home')} 
-            onOpenFile={handleInitiateOpenFile} 
-          />
-        )}
       </main>
 
       {/* Footer */}
@@ -219,7 +240,7 @@ export default function App() {
       <GlobalSearchModal
         isOpen={showSearchModal}
         onClose={() => setShowSearchModal(false)}
-        items={publicItems}
+        items={filteredItems}
         onSelectItem={(item) => {
           if (item.type === 'folder') {
             handleOpenFolder(item.id);

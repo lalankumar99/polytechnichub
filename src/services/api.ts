@@ -1,4 +1,4 @@
-import { StudyItem, LibraryStats, AdminUser } from '../types';
+import { FeedbackSubmission, StudyItem, LibraryStats, AdminUser } from '../types';
 
 const API_BASE = '/api';
 
@@ -39,6 +39,116 @@ function getAuthHeaders(): HeadersInit {
 }
 
 export const api = {
+
+  // Feedback
+  async submitFeedback(feedback: { name: string, email: string, mobile: string, suggestion: string }) {
+    const res = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(feedback)
+    });
+    if (!res.ok) throw new Error('Failed to submit feedback');
+    return res.json();
+  },
+
+  async getFeedback(): Promise<FeedbackSubmission[]> {
+    const res = await fetch('/api/feedback', { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch feedback');
+    return res.json();
+  },
+
+
+  // Premium Courses
+  async getPremiumCourses(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/premium/courses`);
+    const data = await res.json();
+    return data.courses || [];
+  },
+
+  async getPremiumCourse(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium/courses/${id}`);
+    const data = await res.json();
+    return data.course;
+  },
+
+  async createPremiumCourse(courseData: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium/courses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(courseData)
+    });
+    return (await res.json()).course;
+  },
+  async updatePremiumCourse(id: string, updates: any): Promise<void> {
+    await fetch(`${API_BASE}/premium/courses/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates)
+    });
+  },
+  async deletePremiumCourse(id: string): Promise<void> {
+    await fetch(`${API_BASE}/premium/courses/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+  },
+  // Premium Items
+  async getPremiumItems(courseId: string): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/premium/items/${courseId}`);
+    const data = await res.json();
+    return data.items || [];
+  },
+  async createPremiumItem(itemData: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(itemData)
+    });
+    return (await res.json()).item;
+  },
+  async updatePremiumItem(id: string, updates: any): Promise<void> {
+    await fetch(`${API_BASE}/premium/items/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates)
+    });
+  },
+  async deletePremiumItem(id: string): Promise<void> {
+    await fetch(`${API_BASE}/premium/items/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+  },
+  // Premium Requests
+  async getPremiumRequests(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/premium/requests`, {
+      headers: getAuthHeaders()
+    });
+    const data = await res.json();
+    return data.requests || [];
+  },
+
+  async getUserPremiumRequests(userId: string): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/premium/requests/user/${userId}`);
+    const data = await res.json();
+    return data.requests || [];
+  },
+
+  async createPremiumRequest(requestData: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestData)
+    });
+    return (await res.json()).request;
+  },
+  async updatePremiumRequest(id: string, updates: any): Promise<void> {
+    await fetch(`${API_BASE}/premium/requests/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates)
+    });
+  },
   // Public APIs
   async getPublicTree(): Promise<StudyItem[]> {
     const res = await fetch(`${API_BASE}/public/tree`);

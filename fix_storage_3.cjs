@@ -5,8 +5,6 @@ const regex = /}\s*}\s*const UPLOADS_DIR = path\.join\(process\.cwd\(\), 'upload
 
 const match = content.match(regex);
 if (match) {
-    // We want to extract this UPLOADS_DIR part and move it to the very end of the file.
-    // And remove the `}` that closes the class, placing it at the end instead.
     let uploadsCode = `
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -14,10 +12,11 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 export const UPLOADS_PATH = UPLOADS_DIR;
 `;
+    // We only want to remove one `}` which belongs to the class, not the method.
+    // Actually `match[0]` contains two `}`.
+    // The first one is the end of the method. The second one is the end of the class.
     
-    let newContent = content.replace(match[0], "\n"); // removes the closing braces and uploads code
-    
-    // Now append the class closing brace and the uploads code
+    let newContent = content.replace(match[0], "\n  }\n"); // keeps the method's closing brace
     newContent += `\n}\n${uploadsCode}`;
     
     fs.writeFileSync('server/storage.ts', newContent);

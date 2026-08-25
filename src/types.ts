@@ -51,3 +51,55 @@ export interface LibraryStats {
 
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc' | 'size-desc' | 'size-asc';
+
+export interface PremiumCourse {
+  id: string;
+  name: string;
+  branch: string;
+  price: number;
+  description: string;
+  bannerUrl?: string;
+  paymentLink?: string;
+  status: ItemStatus;
+  createdAt: string;
+  updatedAt: string;
+  itemCount?: number;
+}
+
+export interface PremiumItem {
+  id: string;
+  courseId: string;
+  name: string;
+  type: ItemType;
+  parentId: string | null;
+  status: ItemStatus;
+  size: number;
+  fileUrl?: string;
+  content?: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  itemCount?: number;
+}
+
+export interface PremiumAccessRequest {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  mobile?: string;
+  courseId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeedbackSubmission {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string;
+  suggestion: string;
+  createdAt: string;
+}

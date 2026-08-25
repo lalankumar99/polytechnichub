@@ -1,3 +1,4 @@
+import { PremiumCourseView } from './components/PremiumCourseView';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -10,10 +11,12 @@ import { ViewingRequirementModal } from './components/ViewingRequirementModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { api, authState } from './services/api';
+import { auth } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { StudyItem, LibraryStats, AdminUser } from './types';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'browse' | 'admin' | 'about'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'browse' | 'admin' | 'about' | 'premium'>('home');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   
   // Data
@@ -23,6 +26,7 @@ export default function App() {
 
   // Authentication
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => authState.getUser());
+  const [studentUser, setStudentUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   // Search Modal
@@ -31,7 +35,16 @@ export default function App() {
   // Viewer & Requirement Flow
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
+  const [selectedPremiumCourse, setSelectedPremiumCourse] = useState<any | null>(null);
   const [initialFullscreenPref, setInitialFullscreenPref] = useState<boolean>(false);
+
+  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setStudentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load public data
   const loadPublicData = useCallback(async () => {
@@ -70,7 +83,7 @@ export default function App() {
   }, []);
 
   // Navigation handlers
-  const handleNavigate = (view: 'home' | 'browse' | 'admin' | 'about', folderId: string | null = null) => {
+  const handleNavigate = (view: 'home' | 'browse' | 'admin' | 'about' | 'premium', folderId: string | null = null) => {
     if (view === 'admin' && !adminUser) {
       setShowLoginModal(true);
       return;
@@ -79,6 +92,12 @@ export default function App() {
     if (view === 'browse') {
       setCurrentFolderId(folderId);
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenPremiumCourse = (course: any) => {
+    setSelectedPremiumCourse(course);
+    setCurrentView('premium');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -135,6 +154,7 @@ export default function App() {
             onNavigateBrowse={(folderId) => handleNavigate('browse', folderId)}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenFile={handleInitiateOpenFile}
+            onOpenPremiumCourse={handleOpenPremiumCourse}
             stats={publicStats}
             items={publicItems}
           />
@@ -158,6 +178,15 @@ export default function App() {
           <AdminDashboard
             onOpenFile={handleInitiateOpenFile}
             onRefreshPublicData={loadPublicData}
+          />
+        )}
+      
+        {currentView === 'premium' && selectedPremiumCourse && (
+          <PremiumCourseView 
+            course={selectedPremiumCourse} 
+            user={studentUser} 
+            onBack={() => setCurrentView('home')} 
+            onOpenFile={handleInitiateOpenFile} 
           />
         )}
       </main>

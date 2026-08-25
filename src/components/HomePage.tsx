@@ -22,8 +22,11 @@ import {
 import { StudyItem, LibraryStats } from '../types';
 import { formatFileSize, formatDate } from '../utils/formatters';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { PremiumSection } from './PremiumSection';
+import { PremiumCourse } from '../types';
 
 interface HomePageProps {
+  onOpenPremiumCourse?: (course: PremiumCourse) => void;
   onNavigateBrowse: (folderId?: string | null) => void;
   onOpenSearch: () => void;
   onOpenFile: (file: StudyItem) => void;
@@ -36,7 +39,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenSearch,
   onOpenFile,
   stats,
-  items
+  items,
+  onOpenPremiumCourse
 }) => {
   const { isInstallable, promptInstall } = usePWAInstall();
   // Recent published files

@@ -396,6 +396,44 @@ app.use('/uploads', express.static(UPLOADS_PATH));
 
 
 
+
+// Premium Courses
+app.get('/api/premium-courses', async (req, res) => {
+  try {
+    const courses = await storage.getPremiumCourses();
+    res.json(courses);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/premium-courses', adminAuthMiddleware, async (req, res) => {
+  try {
+    const course = await storage.createPremiumCourse(req.body);
+    res.status(201).json(course);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/premium-courses/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    await storage.updatePremiumCourse(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/premium-courses/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    await storage.deletePremiumCourse(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Premium Users Endpoints
 app.post('/api/premium-users/register', async (req, res) => {
   try {

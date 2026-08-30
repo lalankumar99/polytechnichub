@@ -1,51 +1,42 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/services/api.ts', 'utf-8');
+let code = fs.readFileSync('src/services/api.ts', 'utf-8');
 
-const additionalMethods = `
-  // Premium User Management
-  async registerPremiumUser(data: any): Promise<any> {
-    const res = await fetch(\`\${API_BASE}/premium-users/register\`, {
+const premiumCoursesApiStr = `
+  // Premium Courses
+  async getPremiumCourses(): Promise<PremiumCourse[]> {
+    const res = await fetch(\`\${API_BASE}/premium-courses\`);
+    return await res.json();
+  },
+  async createPremiumCourse(data: any): Promise<PremiumCourse> {
+    const res = await fetch(\`\${API_BASE}/admin/premium-courses\`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  async loginPremiumUser(data: any): Promise<any> {
-    const res = await fetch(\`\${API_BASE}/premium-users/login\`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  async getAdminPremiumUsers(): Promise<any[]> {
-    const res = await fetch(\`\${API_BASE}/admin/premium-users\`, {
-      headers: getAuthHeaders()
-    });
-    const data = await res.json();
-    return data.users || [];
-  },
-  async updateAdminPremiumUser(id: string, data: any): Promise<any> {
-    const res = await fetch(\`\${API_BASE}/admin/premium-users/\${id}\`, {
-      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
       body: JSON.stringify(data)
     });
-    return res.json();
+    return await res.json();
   },
-  async deleteAdminPremiumUser(id: string): Promise<any> {
-    const res = await fetch(\`\${API_BASE}/admin/premium-users/\${id}\`, {
+  async updatePremiumCourse(id: string, data: any): Promise<void> {
+    await fetch(\`\${API_BASE}/admin/premium-courses/\${id}\`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify(data)
+    });
+  },
+  async deletePremiumCourse(id: string): Promise<void> {
+    await fetch(\`\${API_BASE}/admin/premium-courses/\${id}\`, {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    return res.json();
-  }
-};`;
+  },
+`;
 
-content = content.replace(/};\s*$/, additionalMethods);
-
-fs.writeFileSync('src/services/api.ts', content);
+if (!code.includes('getPremiumCourses()')) {
+  code = code.replace('export const api = {', 'export const api = {' + premiumCoursesApiStr);
+  fs.writeFileSync('src/services/api.ts', code);
+}

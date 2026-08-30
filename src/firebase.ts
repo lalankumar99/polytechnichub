@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -30,6 +30,11 @@ isSupported().then((supported) => {
 }).catch(console.error);
 
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Fix for Code: 14 UNAVAILABLE: read ECONNRESET error in Firestore
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+});
+
 export { app, storage, auth, db };
 

@@ -142,91 +142,57 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div id="polytechnic-home-view" className="space-y-16 pb-16">
       
-      {/* HERO SECTION */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-slate-800">
-        {/* Glow ambient */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
-          
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-cyan-500/30 text-cyan-400 text-xs font-semibold shadow-inner">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Folder-Based Polytechnic Digital Study Library</span>
+      {/* APP-STYLE DASHBOARD HERO */}
+      <section className="pt-6 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Welcome to <span className="text-blue-600">PolyHub</span>
+            </h1>
+            <p className="text-sm text-slate-500 max-w-md">
+              Your digital study library. Browse notes, previous year questions, and curriculum files effortlessly.
+            </p>
           </div>
-
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight font-sans">
-            Your Polytechnic <br className="hidden sm:inline" />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-300">
-              Study Library
-            </span>
-          </h1>
-
-          <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Organized Notes, Documents and Study Materials — All in One Place.
-          </p>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
-            <button
-              id="hero-browse-btn"
-              onClick={() => onNavigateBrowse(null)}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <FolderTree className="w-4 h-4" />
-              <span>Browse Notes</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
+          
+          <div className="flex flex-wrap items-center gap-3">
+             <button
               onClick={() => onOpenPremiumCourse && onOpenPremiumCourse()}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 shadow-sm transition-all flex items-center space-x-2"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Premium Access</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              id="hero-search-btn"
-              onClick={onOpenSearch}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700 hover:border-slate-600 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md"
-            >
-              <Search className="w-4 h-4 text-cyan-400" />
-              <span>Search Materials</span>
+              <span>Premium</span>
             </button>
             {isInstallable && (
               <button
                 id="hero-install-btn"
                 onClick={promptInstall}
-                className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-100 border border-cyan-500/30 hover:border-cyan-400 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all flex items-center space-x-2"
               >
-                <Download className="w-4 h-4 text-cyan-400 animate-bounce" />
+                <Download className="w-4 h-4" />
                 <span>Install App</span>
               </button>
             )}
-
           </div>
+        </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto pt-6 text-left">
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-3.5">
-              <span className="text-xs text-slate-400 block font-medium">Total Folders</span>
-              <span className="text-xl font-extrabold text-white font-mono">{stats?.totalFolders ?? 18}+</span>
-            </div>
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-3.5">
-              <span className="text-xs text-slate-400 block font-medium">Published Documents</span>
-              <span className="text-xl font-extrabold text-cyan-400 font-mono">{stats?.totalFiles ?? 8}+</span>
-            </div>
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-3.5">
-              <span className="text-xs text-slate-400 block font-medium">Interactive Guides</span>
-              <span className="text-xl font-extrabold text-emerald-400 font-mono">{stats?.totalFiles ?? 4}+</span>
-            </div>
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-3.5">
-              <span className="text-xs text-slate-400 block font-medium">Total Reads</span>
-              <span className="text-xl font-extrabold text-indigo-300 font-mono">{stats?.totalViews ?? 3400}+</span>
-            </div>
+        {/* Quick Metrics Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
+            <span className="text-2xl font-extrabold text-blue-600 font-mono">{stats?.totalFolders ?? 18}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Folders</span>
           </div>
-
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
+            <span className="text-2xl font-extrabold text-cyan-600 font-mono">{stats?.totalFiles ?? 8}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Docs</span>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
+            <span className="text-2xl font-extrabold text-emerald-600 font-mono">{stats?.totalFiles ?? 4}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Guides</span>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
+            <span className="text-2xl font-extrabold text-indigo-600 font-mono">{stats?.totalViews ?? 3400}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Reads</span>
+          </div>
         </div>
       </section>
 
@@ -284,18 +250,18 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* POPULAR SUBJECTS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
-              <div className="flex items-center space-x-2 text-cyan-400 text-xs font-bold uppercase tracking-wider mb-1">
+              <div className="flex items-center space-x-2 text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">
                 <BookOpen className="w-4 h-4" />
                 <span>Featured Curriculum</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Popular Subjects & Unit Packs</h2>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Popular Subjects & Unit Packs</h2>
             </div>
             <button
               onClick={() => onNavigateBrowse(null)}
-              className="text-xs font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5"
+              className="text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3.5 py-2 rounded-lg transition-colors flex items-center space-x-1.5"
             >
               <FolderOpen className="w-4 h-4" />
               <span>Open Library Tree</span>
@@ -309,30 +275,30 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div
                   key={idx}
                   onClick={() => onNavigateBrowse(sub.folderId)}
-                  className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/40 rounded-xl p-4 transition-all cursor-pointer group flex flex-col justify-between"
+                  className="bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-md rounded-xl p-4 transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center space-x-2 text-xs text-cyan-400 font-semibold mb-2">
-                      <Icon className="w-4 h-4 text-cyan-400" />
+                    <div className="flex items-center space-x-2 text-xs text-blue-600 font-semibold mb-2">
+                      <Icon className="w-4 h-4 text-blue-600" />
                       <span>{sub.branch}</span>
                     </div>
-                    <h3 className="font-bold text-white text-sm group-hover:text-cyan-300 transition-colors leading-snug">
+                    <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-700 transition-colors leading-snug">
                       {sub.name}
                     </h3>
-                    <span className="inline-block text-[11px] text-slate-400 mt-1">{sub.sem}</span>
+                    <span className="inline-block text-[11px] text-slate-500 mt-1">{sub.sem}</span>
 
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {sub.tags.map((tag, tIdx) => (
-                        <span key={tIdx} className="text-[10px] bg-slate-900/90 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                        <span key={tIdx} className="text-[10px] bg-white text-slate-600 px-2 py-0.5 rounded border border-slate-200">
                           {tag}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-300 group-hover:text-cyan-300 font-semibold">
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 group-hover:text-blue-600 font-semibold">
                     <span>Open Unit Folders</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform text-cyan-400" />
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               );
@@ -421,56 +387,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-            {/* WHY POLYTECHNIC APP SECTION WITH 3D FACTS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-100 rounded-2xl p-6 sm:p-8 border border-slate-200/80 overflow-hidden relative">
-          
-          <div className="text-center max-w-2xl mx-auto mb-10 relative z-10">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Engineered for Polytechnic Success</h2>
-            <p className="text-sm text-slate-600 mt-2">Direct access to curriculum folders without distracting clutter.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-            
-            <div className="group [perspective:1000px]">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateX(5deg)_rotateY(-5deg)_translateZ(10px)] group-hover:shadow-xl group-hover:border-blue-300">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold [transform:translateZ(20px)] shadow-sm">
-                  1
-                </div>
-                <h3 className="font-bold text-base text-slate-900 [transform:translateZ(20px)]">Unlimited Folders</h3>
-                <p className="text-xs text-slate-600 leading-relaxed [transform:translateZ(15px)]">
-                  Branch &rarr; Semester &rarr; Subject hierarchy mirroring your exact syllabus structure with deep breadcrumb tracing.
-                </p>
-              </div>
-            </div>
-
-            <div className="group [perspective:1000px]">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateX(5deg)_rotateY(-5deg)_translateZ(10px)] group-hover:shadow-xl group-hover:border-emerald-300">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold [transform:translateZ(20px)] shadow-sm">
-                  2
-                </div>
-                <h3 className="font-bold text-base text-slate-900 [transform:translateZ(20px)]">Immersive Viewer</h3>
-                <p className="text-xs text-slate-600 leading-relaxed [transform:translateZ(15px)]">
-                  Optimized reading viewport with distraction-free landscape mode for clear mathematical and circuit analysis.
-                </p>
-              </div>
-            </div>
-
-            <div className="group [perspective:1000px]">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateX(5deg)_rotateY(-5deg)_translateZ(10px)] group-hover:shadow-xl group-hover:border-rose-300">
-                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold [transform:translateZ(20px)] shadow-sm">
-                  3
-                </div>
-                <h3 className="font-bold text-base text-slate-900 [transform:translateZ(20px)]">Instant Sync</h3>
-                <p className="text-xs text-slate-600 leading-relaxed [transform:translateZ(15px)]">
-                  The moment faculty uploads new study materials, they become live for students across all devices instantly.
-                </p>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+      
     </div>
   );
 };

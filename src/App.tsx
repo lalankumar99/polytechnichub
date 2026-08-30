@@ -1,4 +1,6 @@
+import { BottomNavigation } from './components/BottomNavigation';
 import { PremiumPortal } from './components/PremiumPortal';
+import { PremiumCoursesView } from './components/PremiumCoursesView';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -16,7 +18,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { StudyItem, LibraryStats, AdminUser } from './types';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'browse' | 'admin' | 'about' | 'premium'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses'>('home');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   
   // Data
@@ -36,7 +38,12 @@ export default function App() {
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
   const [showPremiumPortal, setShowPremiumPortal] = useState(false);
-  const [premiumUser, setPremiumUser] = useState<any>(null);
+  const [premiumUser, setPremiumUser] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem('polytechnic_premium_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) { return null; }
+  });
   const [initialFullscreenPref, setInitialFullscreenPref] = useState<boolean>(false);
 
   
@@ -84,7 +91,7 @@ export default function App() {
   }, []);
 
   // Navigation handlers
-  const handleNavigate = (view: 'home' | 'browse' | 'admin' | 'about' | 'premium', folderId: string | null = null) => {
+  const handleNavigate = (view: 'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses', folderId: string | null = null) => {
     if (view === 'admin' && !adminUser) {
       setShowLoginModal(true);
       return;
@@ -177,7 +184,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main className="flex-1 pb-20 md:pb-0">
         {currentView === 'home' && (
           <HomePage
             onNavigateBrowse={(folderId) => handleNavigate('browse', folderId)}
@@ -213,10 +220,12 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer
-        onNavigate={handleNavigate}
-        onOpenLogin={() => setShowLoginModal(true)}
-      />
+      <div className="hidden md:block">
+        <Footer
+          onNavigate={handleNavigate}
+          onOpenLogin={() => setShowLoginModal(true)}
+        />
+      </div>
 
       {/* Requirement Screen ("Better Learning Experience" modal) */}
       {selectedFileForRequirement && (
@@ -233,6 +242,18 @@ export default function App() {
           file={activeViewingFile}
           onClose={handleCloseViewer}
           initialFullscreen={initialFullscreenPref}
+        />
+      )}
+
+      
+      {/* Premium Student Portal (Login/Register) */}
+      {showPremiumPortal && (
+        <PremiumPortal 
+          onLoginSuccess={(user) => {
+            setPremiumUser(user);
+            setShowPremiumPortal(false);
+          }}
+          onClose={() => setShowPremiumPortal(false)}
         />
       )}
 
@@ -258,6 +279,13 @@ export default function App() {
           setAdminUser(user);
           setCurrentView('admin');
         }}
+      />
+
+      <BottomNavigation
+        currentView={currentView}
+        onNavigate={handleNavigate}
+        onOpenSearch={() => setShowSearchModal(true)}
+        isAdmin={!!adminUser}
       />
 
     </div>

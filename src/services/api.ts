@@ -360,7 +360,7 @@ export const api = {
   },
   async updateAdminPremiumUser(id: string, data: any): Promise<any> {
     const res = await fetch(`${API_BASE}/admin/premium-users/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()

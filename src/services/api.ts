@@ -341,7 +341,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
+    const result = await res.json();
+    if (!result.success) throw new Error(result.error || 'Registration failed');
+    return result.user;
   },
   async loginPremiumUser(data: any): Promise<any> {
     const res = await fetch(`${API_BASE}/premium-users/login`, {
@@ -349,7 +351,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
+    const result = await res.json();
+    if (!result.success) throw new Error(result.error || 'Login failed');
+    return result.user;
   },
   async getAdminPremiumUsers(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/admin/premium-users`, {

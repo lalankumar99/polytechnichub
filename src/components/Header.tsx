@@ -14,6 +14,8 @@ interface HeaderProps {
   currentView: 'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses' | 'premium' | 'premium-courses';
   onNavigate: (view: 'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses', folderId?: string | null) => void;
   adminUser: AdminUser | null;
+  premiumUser?: any;
+  onPremiumLogout?: () => void;
   onOpenLogin: () => void;
   onOpenSearch: () => void;
   onLogout: () => void;
@@ -25,7 +27,9 @@ export const Header: React.FC<HeaderProps> = ({
   adminUser,
   onOpenLogin,
   onOpenSearch,
-  onLogout
+  onLogout,
+  premiumUser,
+  onPremiumLogout
 }) => {
   return (
     <header id="polytechnic-header" className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 text-slate-900 shadow-sm">
@@ -131,7 +135,26 @@ export const Header: React.FC<HeaderProps> = ({
             )}
             
             {/* Mobile Header Icons */}
-            {!adminUser && (
+            {premiumUser && !adminUser && (
+              <div className="hidden md:flex items-center space-x-2 bg-indigo-50 border border-indigo-100 rounded-xl p-1 pl-3">
+                <div className="flex items-center space-x-1.5">
+                  <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
+                    {premiumUser.name ? premiumUser.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <span className="text-xs font-bold text-indigo-900 max-w-[100px] truncate">{premiumUser.name}</span>
+                  {premiumUser.status === 'approved' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Premium Active" />}
+                </div>
+                <button
+                  onClick={onPremiumLogout}
+                  className="p-1.5 rounded-lg text-indigo-400 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-2"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            
+            {!adminUser && !premiumUser && (
               <button
                 onClick={onOpenLogin}
                 className="md:hidden p-2 rounded-full text-slate-400 hover:text-slate-700 bg-slate-50"

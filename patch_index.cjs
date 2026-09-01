@@ -1,5 +1,33 @@
 const fs = require('fs');
-let html = fs.readFileSync('index.html', 'utf-8');
-html = html.replace('<link rel="manifest" href="/manifest.json" />', '');
-html = html.replace('</head>', '  <link rel="icon" href="/icon.svg" type="image/svg+xml">\n    <link rel="apple-touch-icon" href="/icon-192.png">\n  </head>');
-fs.writeFileSync('index.html', html);
+
+let index = fs.readFileSync('index.html', 'utf-8');
+
+// Add manifest link
+if (!index.includes('rel="manifest"')) {
+  index = index.replace(
+    '</title>',
+    `</title>\n    <link rel="manifest" href="/manifest.json" />`
+  );
+}
+
+// Add service worker registration
+if (!index.includes('serviceWorker')) {
+  index = index.replace(
+    '</body>',
+    `  <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then((registration) => {
+            console.log('ServiceWorker registration successful');
+          }).catch((err) => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+  </body>`
+  );
+}
+
+fs.writeFileSync('index.html', index);
+console.log('Patched index.html');

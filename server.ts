@@ -473,7 +473,7 @@ app.post('/api/premium-users/login', async (req, res) => {
       return res.status(403).json({ success: false, error: 'Account access has been revoked' });
     }
     // We omit real JWT for simplicity, returning user object is enough for frontend persistence here
-    res.json({ success: true, user: { id: user.id, internalId: user.internalId, name: user.name, email: user.email, mobile: user.mobile } });
+    res.json({ success: true, user: { id: user.id, internalId: user.internalId, name: user.name, email: user.email, mobile: user.mobile, status: user.status } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1,4 +1,9 @@
+const fs = require('fs');
 
+let code = fs.readFileSync('src/components/PremiumCourseView.tsx', 'utf-8');
+
+// The file has a complex setup. We can just replace the whole file to make it cleaner.
+const newCode = `
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { PremiumCourse, PremiumItem } from '../types';
@@ -122,3 +127,7 @@ export const PremiumCourseView: React.FC<PremiumCourseViewProps> = ({ course, on
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/PremiumCourseView.tsx', newCode);
+console.log('PremiumCourseView updated to use the unified premium user system.');

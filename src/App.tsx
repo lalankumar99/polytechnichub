@@ -41,7 +41,15 @@ export default function App() {
   const [premiumUser, setPremiumUser] = useState<any>(() => {
     try {
       const stored = localStorage.getItem('polytechnic_premium_user');
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.success && parsed.user) {
+          localStorage.setItem('polytechnic_premium_user', JSON.stringify(parsed.user));
+          return parsed.user;
+        }
+        return parsed;
+      }
+      return null;
     } catch (e) { return null; }
   });
   const [initialFullscreenPref, setInitialFullscreenPref] = useState<boolean>(false);
@@ -181,6 +189,11 @@ export default function App() {
         onOpenLogin={() => setShowLoginModal(true)}
         onOpenSearch={() => setShowSearchModal(true)}
         onLogout={handleLogout}
+        premiumUser={premiumUser}
+        onPremiumLogout={() => {
+          localStorage.removeItem('polytechnic_premium_user');
+          setPremiumUser(null);
+        }}
       />
 
       {/* Main Content Area */}

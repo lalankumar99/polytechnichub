@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const hookCode = `import { useState, useEffect } from 'react';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
@@ -61,11 +63,15 @@ export function usePWAInstall() {
         setDeferredPrompt(null);
       }
     } else if (isIOS) {
-      alert("To install this app on your iPhone or iPad:\n\n1. Tap the Share button (square with an up arrow)\n2. Scroll down and tap 'Add to Home Screen'");
+      alert("To install this app on your iPhone or iPad:\\n\\n1. Tap the Share button (square with an up arrow)\\n2. Scroll down and tap 'Add to Home Screen'");
     } else {
-      alert("To install this app:\n\nTap the menu in your browser and select 'Add to Home Screen' or 'Install App'.");
+      alert("To install this app:\\n\\nTap the menu in your browser and select 'Add to Home Screen' or 'Install App'.");
     }
   };
 
   return { isInstallable, promptInstall };
 }
+`;
+
+fs.writeFileSync('src/hooks/usePWAInstall.ts', hookCode);
+console.log('usePWAInstall updated for iOS compatibility');

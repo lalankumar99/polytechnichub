@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "StudyItem": {
+      "title": "StudyItem",
+      "description": "Represents a folder, PDF, or HTML study note in the library.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["folder", "pdf", "html"] },
+        "parentId": { "type": "string", "description": "Null if root level." },
+        "status": { "type": "string", "enum": ["published", "draft", "unpublished"] },
+        "size": { "type": "number" },
+        "fileUrl": { "type": "string" },
+        "content": { "type": "string" },
+        "description": { "type": "string" },
+        "branch": { "type": "string" },
+        "semester": { "type": "string" },
+        "subject": { "type": "string" },
+        "unit": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "downloadsCount": { "type": "number" },
+        "viewsCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "status", "size", "downloadsCount", "viewsCount", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "studyItems/{itemId}": {
+      "schema": { "$ref": "#/entities/StudyItem" },
+      "description": "The collection of all folders and study materials."
+    }
+  }
+}

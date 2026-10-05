@@ -17,10 +17,15 @@ import { ExternalLink,
   Share2,
   Check,
   Smartphone,
-  BookOpen
+  BookOpen,
+  Eye,
+  Youtube,
+  Play
 } from 'lucide-react';
 import { StudyItem } from '../types';
-import { requestFullscreenAndLandscape, exitFullscreen, formatFileSize } from '../utils/formatters';
+import { requestFullscreenAndLandscape, exitFullscreen, formatFileSize, getMaskedDisplayName, getEffectiveDisplayType, extractYoutubeId } from '../utils/formatters';
+import { DrivePdfViewer } from './DrivePdfViewer';
+import { extractDriveFileId } from '../utils/googleDrive';
 
 import html2pdf from 'html2pdf.js';
 
@@ -35,6 +40,245 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   onClose,
   initialFullscreen = false
 }) => {
+  const effType = getEffectiveDisplayType(file);
+  const driveFileId = extractDriveFileId(file.fileUrl || '') || extractDriveFileId(file.id || '');
+  const isGoogleDrivePdf = !!driveFileId || (file.fileUrl && (file.fileUrl.includes('drive.google.com') || file.fileUrl.includes('docs.google.com')));
+
+  // Render DrivePdfViewer directly for Google Drive PDFs
+  if (isGoogleDrivePdf) {
+    return (
+      <DrivePdfViewer
+        driveSource={file.fileUrl || file.id}
+        title={file.name}
+        subtitle={[file.branch, file.semester, file.subject].filter(Boolean).join(' • ')}
+        onClose={onClose}
+        autoFullscreen={initialFullscreen}
+      />
+    );
+  }
+
+  const isVideo = effType === 'video' ||
+    file.type === 'youtube' ||
+    file.isVideo ||
+    (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be'))) ||
+    !!extractYoutubeId(file.fileUrl);
+
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const lastTapRef = useRef<number>(0);
+
+  // AUTOMATIC FULLSCREEN + LANDSCAPE MODE FOR VIDEOS
+  useEffect(() => {
+    if (!isVideo) return;
+
+    const launchLandscapeFullscreen = async () => {
+      try {
+        /* Landscape lock */
+        if (screen.orientation && (screen.orientation as any).lock) {
+          try {
+            await (screen.orientation as any).lock('landscape');
+          } catch (e) {}
+        }
+
+        /* Auto fullscreen */
+        const el = videoContainerRef.current;
+        if (el) {
+          if (el.requestFullscreen) {
+            await el.requestFullscreen().catch(() => {});
+          } else if ((el as any).webkitRequestFullscreen) {
+            (el as any).webkitRequestFullscreen();
+          } else if ((el as any).msRequestFullscreen) {
+            (el as any).msRequestFullscreen();
+          }
+        }
+      } catch (err) {
+        console.log('Fullscreen/Landscape error:', err);
+      }
+    };
+
+    launchLandscapeFullscreen();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleVideoBack();
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        handleFullscreenToggle();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      try {
+        if (screen.orientation && (screen.orientation as any).unlock) {
+          (screen.orientation as any).unlock();
+        }
+      } catch (e) {}
+    };
+  }, [isVideo]);
+
+  const handleVideoBack = async () => {
+    try {
+      if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen().catch(() => {});
+        } else if ((document as any).webkitExitFullscreen) {
+          (document as any).webkitExitFullscreen();
+        }
+      }
+      if (screen.orientation && (screen.orientation as any).unlock) {
+        (screen.orientation as any).unlock();
+      }
+    } catch (e) {}
+    onClose();
+  };
+
+  const handleFullscreenToggle = async () => {
+    try {
+      const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+      if (isFs) {
+        if (document.exitFullscreen) await document.exitFullscreen().catch(() => {});
+        else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
+        if (screen.orientation && (screen.orientation as any).unlock) {
+          try { (screen.orientation as any).unlock(); } catch (e) {}
+        }
+      } else {
+        const el = videoContainerRef.current || document.documentElement;
+        if (el.requestFullscreen) {
+          await el.requestFullscreen({ navigationUI: 'hide' } as any).catch(() => {});
+        } else if ((el as any).webkitRequestFullscreen) {
+          (el as any).webkitRequestFullscreen();
+        } else if ((el as any).mozRequestFullScreen) {
+          (el as any).mozRequestFullScreen();
+        } else if ((el as any).msRequestFullscreen) {
+          (el as any).msRequestFullscreen();
+        }
+
+        if (screen.orientation && (screen.orientation as any).lock) {
+          try {
+            await (screen.orientation as any).lock('landscape');
+          } catch (e) {
+            try {
+              await (screen.orientation as any).lock('landscape-primary');
+            } catch (e2) {}
+          }
+        }
+      }
+    } catch (err) {
+      console.log('Fullscreen error:', err);
+    }
+  };
+
+  const handleVideoTouchEnd = (event: React.TouchEvent) => {
+    const now = Date.now();
+    const difference = now - lastTapRef.current;
+    if (difference < 350 && difference > 0) {
+      handleFullscreenToggle();
+      event.preventDefault();
+    }
+    lastTapRef.current = now;
+  };
+
+  // IF VIDEO: RENDER ONLY FULLSCREEN LANDSCAPE VIDEO WITH TOP BACK ARROW & BOTTOM FULLSCREEN
+  if (isVideo) {
+    const ytId = extractYoutubeId(file.fileUrl);
+    let srcUrl = '';
+    if (ytId) {
+      srcUrl = `https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+    } else if (file.fileUrl) {
+      if (file.fileUrl.includes('watch?v=')) {
+        const id = file.fileUrl.split('watch?v=')[1]?.split('&')[0];
+        srcUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+      } else if (file.fileUrl.includes('youtu.be/')) {
+        const id = file.fileUrl.split('youtu.be/')[1]?.split('?')[0];
+        srcUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+      } else {
+        srcUrl = file.fileUrl;
+      }
+    }
+
+    return (
+      <>
+        <style>{`
+          /* FORCED 100% UNBREAKABLE LANDSCAPE LOCK & EDGE-TO-EDGE FULLSCREEN */
+          @media screen and (orientation: portrait) {
+            .force-landscape-player {
+              position: fixed !important;
+              top: 50% !important;
+              left: 50% !important;
+              width: 100vh !important;
+              height: 100vw !important;
+              transform: translate(-50%, -50%) rotate(90deg) !important;
+              transform-origin: center center !important;
+              overflow: hidden !important;
+              z-index: 9999999 !important;
+              background: #000 !important;
+            }
+          }
+          @media screen and (orientation: landscape) {
+            .force-landscape-player {
+              position: fixed !important;
+              inset: 0 !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100vw !important;
+              height: 100vh !important;
+              transform: none !important;
+              overflow: hidden !important;
+              z-index: 9999999 !important;
+              background: #000 !important;
+            }
+          }
+          .force-landscape-player iframe {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border: 0 !important;
+            display: block !important;
+          }
+        `}</style>
+        <div
+          ref={videoContainerRef}
+          onTouchEnd={handleVideoTouchEnd}
+          className="force-landscape-player bg-black select-none m-0 p-0"
+        >
+          {/* Full-width, full-height edge-to-edge Video */}
+          <iframe
+            src={srcUrl}
+            title={file.videoTitle || file.name}
+            className="absolute inset-0 w-full h-full border-0 m-0 p-0 block"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+
+          {/* TOP LEFT BACK ARROW */}
+          <button
+            onClick={handleVideoBack}
+            className="absolute top-3 left-3 z-[10000000] px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-white/20 flex items-center space-x-1.5 text-xs font-bold"
+            aria-label="Back to Library"
+            title="Back"
+          >
+            <ArrowLeft className="w-4 h-4 text-white" />
+            <span>Back</span>
+          </button>
+
+          {/* BOTTOM RIGHT FULLSCREEN TOGGLE */}
+          <button
+            onClick={handleFullscreenToggle}
+            className="absolute bottom-3 right-3 z-[10000000] px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-white/20 text-xs font-bold flex items-center space-x-1.5"
+            aria-label="Toggle Fullscreen"
+            title="Original Fullscreen"
+          >
+            <Maximize className="w-4 h-4 text-cyan-400" />
+            <span>Fullscreen</span>
+          </button>
+        </div>
+      </>
+    );
+  }
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -45,10 +289,20 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   const [copied, setCopied] = useState(false);
   const [orientationMsg, setOrientationMsg] = useState<string | null>(null);
   const [pdfLoadError, setPdfLoadError] = useState(false);
+  const [showZoomToast, setShowZoomToast] = useState(false);
+  const zoomToastTimerRef = useRef<any>(null);
 
-  const isPdf = file.type === 'pdf';
-  const isYoutube = file.type === 'youtube';
-  const isLink = file.type === 'link';
+  // Multi-Touch Pinch-to-Zoom State
+  const touchStateRef = useRef<{
+    initialDist: number;
+    initialZoom: number;
+    isPinching: boolean;
+  }>({ initialDist: 0, initialZoom: 100, isPinching: false });
+
+  const displayName = getMaskedDisplayName(file);
+  const isPdf = effType === 'pdf';
+  const isYoutube = false;
+  const isLink = effType === 'link';
   const fileApiUrl = file.fileUrl || `/api/files/${file.id}`;
 
   // Enter fullscreen on mount if requested
@@ -93,8 +347,28 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
     }
   };
 
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 15, 200));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 15, 60));
+  const handleZoomIn = () => {
+    setZoomLevel(prev => {
+      const next = Math.min(prev + 15, 300);
+      triggerZoomToast(next);
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => {
+      const next = Math.max(prev - 15, 50);
+      triggerZoomToast(next);
+      return next;
+    });
+  };
+
+  const triggerZoomToast = (level: number) => {
+    setShowZoomToast(true);
+    if (zoomToastTimerRef.current) clearTimeout(zoomToastTimerRef.current);
+    zoomToastTimerRef.current = setTimeout(() => setShowZoomToast(false), 1200);
+  };
+
   const handleRotate = () => setRotation(prev => (prev + 90) % 360);
 
   const handleShare = () => {
@@ -103,73 +377,233 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // TOUCH PINCH-TO-ZOOM HANDLERS
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStateRef.current = {
+        initialDist: dist,
+        initialZoom: zoomLevel,
+        isPinching: true,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStateRef.current.isPinching) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (touchStateRef.current.initialDist > 10) {
+        const factor = dist / touchStateRef.current.initialDist;
+        const newZoom = Math.min(Math.max(Math.round(touchStateRef.current.initialZoom * factor), 50), 300);
+        setZoomLevel(newZoom);
+        triggerZoomToast(newZoom);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      touchStateRef.current.isPinching = false;
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 10 : -10;
+      setZoomLevel(prev => {
+        const next = Math.min(Math.max(prev + delta, 50), 300);
+        triggerZoomToast(next);
+        return next;
+      });
+    }
+  };
+
+  // PROPER A4 PDF DOWNLOAD (210mm x 297mm, 10mm margins, clean typography)
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-    if (isYoutube || isLink) {
-      window.open(fileApiUrl, '_blank');
-      setIsDownloading(false);
-      return;
-    }
-    if (isPdf) {
-      // Fetch as blob to bypass CORS and force download with proper filename
-      let fileName = file.name;
-      if (!fileName.toLowerCase().endsWith('.pdf')) {
-        fileName += '.pdf';
+      if (isYoutube || isLink) {
+        window.open(fileApiUrl, '_blank');
+        setIsDownloading(false);
+        return;
       }
-      try {
-        const response = await fetch(fileApiUrl);
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      } catch (err) {
-        console.error('Blob download failed, falling back:', err);
-        const link = document.createElement('a');
-        link.href = fileApiUrl;
-        link.download = fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } else {
-      // Convert HTML to PDF using html2pdf
-      const element = document.createElement('div');
-      element.style.color = '#0f172a'; // Explicitly set hex color to avoid oklch inheritance error in html2canvas
-      element.style.backgroundColor = '#ffffff';
-      element.innerHTML = file.content || `
-        <div style="padding: 2rem; font-family: sans-serif;">
-          <h1>${file.name.replace(/\.(pdf|html)$/i, '')}</h1>
-          <p>${file.description || 'Study notes uploaded on POLYTECHNIC HUB.'}</p>
-        </div>
-      `;
-      const opt = {
-        margin:       1,
-        filename:     `${file.name.replace(/\.html$/i, '')}.pdf`,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' as const }
-      };
-      
-            // Temporarily suppress console.error for html2canvas oklch parsing errors
-      const originalConsoleError = console.error;
-      console.error = (...args) => {
-        if (typeof args[0] === 'string' && args[0].includes('oklch')) return;
-        originalConsoleError(...args);
-      };
 
-      try {
-        await html2pdf().set(opt).from(element).save();
-      } finally {
-        console.error = originalConsoleError;
+      if (isPdf) {
+        // Native PDF file download
+        let fileName = file.name;
+        if (!fileName.toLowerCase().endsWith('.pdf')) {
+          fileName += '.pdf';
+        }
+        try {
+          const response = await fetch(fileApiUrl);
+          const blob = await response.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+          const link = document.createElement('a');
+          link.href = fileApiUrl;
+          link.download = fileName;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } else {
+        // Convert HTML study note to a balanced, clean A4 PDF (210mm x 297mm)
+        const cleanTitle = file.name.replace(/\.(pdf|html)$/i, '');
+        const container = document.createElement('div');
+        
+        // Proper A4 print container with standard 10mm margins & balanced typography
+        container.style.width = '190mm'; // 210mm - 20mm (10mm left + 10mm right)
+        container.style.padding = '0';
+        container.style.margin = '0 auto';
+        container.style.boxSizing = 'border-box';
+        container.style.backgroundColor = '#ffffff';
+        container.style.color = '#0f172a';
+        container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+        const rawContent = file.content || `
+          <h1>${cleanTitle}</h1>
+          <p>${file.description || 'Study notes uploaded on POLYTECHNIC HUB.'}</p>
+        `;
+
+        container.innerHTML = `
+          <style>
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+            * {
+              box-sizing: border-box;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .a4-pdf-document {
+              width: 190mm;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a;
+              font-size: 11pt;
+              line-height: 1.6;
+              word-wrap: break-word;
+            }
+            .a4-header {
+              border-bottom: 2pt solid #0284c7;
+              padding-bottom: 8pt;
+              margin-bottom: 14pt;
+            }
+            .a4-header-top {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 9pt;
+              color: #64748b;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-bottom: 4pt;
+            }
+            .a4-title {
+              font-size: 18pt;
+              font-weight: 800;
+              color: #0f172a;
+              line-height: 1.25;
+              margin: 0;
+            }
+            .a4-meta {
+              font-size: 9.5pt;
+              color: #475569;
+              margin-top: 4pt;
+            }
+            .a4-content {
+              font-size: 11pt;
+              line-height: 1.6;
+              color: #1e293b;
+            }
+            .a4-content h1 { font-size: 16pt; font-weight: 700; color: #0f172a; margin-top: 14pt; margin-bottom: 6pt; page-break-after: avoid; }
+            .a4-content h2 { font-size: 13.5pt; font-weight: 600; color: #1e293b; margin-top: 12pt; margin-bottom: 5pt; page-break-after: avoid; }
+            .a4-content h3 { font-size: 12pt; font-weight: 600; color: #334155; margin-top: 10pt; margin-bottom: 4pt; page-break-after: avoid; }
+            .a4-content p { margin-bottom: 8pt; }
+            .a4-content ul, .a4-content ol { margin: 6pt 0 8pt 18pt; }
+            .a4-content li { margin-bottom: 3pt; }
+            .a4-content table { width: 100%; border-collapse: collapse; margin: 10pt 0; page-break-inside: avoid; }
+            .a4-content th, .a4-content td { border: 1pt solid #cbd5e1; padding: 6pt 8pt; font-size: 9.5pt; }
+            .a4-content th { background-color: #f1f5f9; font-weight: 700; color: #0f172a; }
+            .a4-content img { max-width: 100%; height: auto; page-break-inside: avoid; margin: 8pt 0; }
+            .a4-content pre, .a4-content code { background: #f8fafc; font-family: monospace; font-size: 9pt; padding: 2pt 4pt; border-radius: 3pt; }
+            .a4-content pre { padding: 8pt; overflow-x: auto; border: 1pt solid #e2e8f0; }
+            .a4-footer {
+              margin-top: 24pt;
+              padding-top: 6pt;
+              border-top: 1pt solid #e2e8f0;
+              font-size: 8pt;
+              color: #94a3b8;
+              text-align: center;
+            }
+          </style>
+          <div class="a4-pdf-document">
+            <div class="a4-header">
+              <div class="a4-header-top">
+                <span>POLYTECHNIC HUB • STUDY NOTES</span>
+                <span>${[file.branch, file.semester].filter(Boolean).join(' • ')}</span>
+              </div>
+              <h1 class="a4-title">${cleanTitle}</h1>
+              ${file.subject || file.unit ? `<div class="a4-meta">${[file.subject, file.unit].filter(Boolean).join(' — ')}</div>` : ''}
+            </div>
+            <div class="a4-content">
+              ${rawContent}
+            </div>
+            <div class="a4-footer">
+              Study Material from Polytechnic Hub • Saved for Offline Learning (A4 Standard)
+            </div>
+          </div>
+        `;
+
+        const opt = {
+          margin: [10, 10, 10, 10] as [number, number, number, number], // 10mm margins on all 4 sides
+          filename: `${cleanTitle}.pdf`,
+          image: { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            letterRendering: true,
+            logging: false,
+            windowWidth: 800
+          },
+          jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait' as const
+          },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+          if (typeof args[0] === 'string' && args[0].includes('oklch')) return;
+          originalConsoleError(...args);
+        };
+
+        try {
+          await html2pdf().set(opt).from(container).save();
+        } finally {
+          console.error = originalConsoleError;
+        }
       }
-      }
+    } catch (err) {
+      console.error('Download error:', err);
     } finally {
       setIsDownloading(false);
     }
@@ -181,8 +615,9 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
     <html>
       <head>
         <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <style>
-          body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; padding: 2rem; max-width: 800px; margin: auto; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 1.5rem; max-width: 900px; margin: auto; }
           h1 { color: #0284c7; }
         </style>
       </head>
@@ -194,48 +629,7 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   `;
 
   // -------------------------------------------------------------
-  // FULL-SCREEN IMMERSIVE HTML VIEWER (Zero UI, 100vw, 100vh)
-  // -------------------------------------------------------------
-  if (!isPdf && !isYoutube && !isLink && isFullscreen) {
-    return (
-      <div
-        ref={containerRef}
-        id="polytechnic-immersive-html-viewer"
-        className="fixed inset-0 z-50 w-screen h-screen m-0 p-0 overflow-hidden bg-white select-text"
-      >
-        {/* Floating Minimal Exit Control */}
-        <div className="fixed top-3 right-3 z-50 flex items-center space-x-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/80 text-white shadow-xl hover:bg-slate-900 transition-all opacity-80 hover:opacity-100">
-          <span className="text-[11px] font-bold text-slate-300 hidden sm:inline">{file.name.replace(/\.(pdf|html)$/i, '')}</span>
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="p-1 rounded-full hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 transition-colors flex items-center space-x-1"
-            title="Exit Full-Screen (Esc)"
-          >
-            <Minimize className="w-4 h-4" />
-            <span className="text-[11px] font-bold">Exit Fullscreen</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-full hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition-colors"
-            title="Close Viewer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 100vw / 100vh Edge-to-Edge Embedded HTML Frame */}
-        <iframe
-          srcDoc={formattedHtml}
-          title={file.name.replace(/\.(pdf|html)$/i, '')}
-          className="w-full h-full border-0 m-0 p-0 block bg-white"
-          sandbox="allow-scripts allow-same-origin allow-popups"
-        />
-      </div>
-    );
-  }
-
-  // -------------------------------------------------------------
-  // STANDARD STUDY VIEWER (PDF and Standard HTML Layout)
+  // STUDY VIEWER (PDF and HTML Layout with STRICT LANDSCAPE MODE)
   // -------------------------------------------------------------
   return (
     <div
@@ -243,8 +637,80 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
       id="polytechnic-study-viewer"
       className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col h-screen overflow-hidden select-none font-sans"
     >
-      {/* TOP HEADER BAR */}
-      <header className="h-14 sm:h-16 bg-slate-900 border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-md">
+      <style>{`
+        /* ========================================================= */
+        /* STRICT LANDSCAPE MODE (Hide all UI, 100% full-screen material) */
+        /* ========================================================= */
+        @media screen and (orientation: landscape) {
+          .study-viewer-header,
+          .study-viewer-footer {
+            display: none !important;
+          }
+          .study-viewer-main {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            border: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 100 !important;
+          }
+          .study-material-wrapper {
+            max-width: 100% !important;
+            width: 100% !important;
+            min-height: 100vh !important;
+            height: auto !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 1.5rem 3.5rem !important;
+          }
+          .study-pdf-wrapper {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+          .study-landscape-back {
+            display: flex !important;
+          }
+        }
+
+        @media screen and (orientation: portrait) {
+          .study-landscape-back {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      {/* FLOATING BACK ARROW FOR STRICT LANDSCAPE MODE */}
+      <button
+        onClick={onClose}
+        className="study-landscape-back fixed top-3 left-3 z-[1000] px-3.5 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white backdrop-blur-md shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-white/20 items-center space-x-1.5 text-xs font-bold"
+        aria-label="Back to Library"
+        title="Back to Library"
+      >
+        <ArrowLeft className="w-4 h-4 text-white" />
+        <span>Back</span>
+      </button>
+
+      {/* PINCH-TO-ZOOM TOAST FEEDBACK */}
+      {showZoomToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[2000] px-3.5 py-1.5 rounded-full bg-slate-900/90 text-cyan-400 text-xs font-mono font-bold border border-cyan-500/40 shadow-2xl pointer-events-none backdrop-blur-md transition-opacity">
+          Zoom: {zoomLevel}%
+        </div>
+      )}
+
+      {/* TOP HEADER BAR (Only visible in Portrait Mode) */}
+      <header className="study-viewer-header h-14 sm:h-16 bg-slate-900 border-b border-slate-800 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-md">
         
         {/* Left: Back + Doc Info */}
         <div className="flex items-center space-x-3 min-w-0">
@@ -260,14 +726,20 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
 
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
+              <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded border shrink-0 ${
+                isPdf ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+                isLink ? 'bg-teal-500/20 text-teal-400 border-teal-500/30' :
                 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
               }`}>
-                {file.type === 'youtube' ? 'VIDEO' : file.type === 'link' ? 'LINK' : file.type.toUpperCase()}
+                {isPdf ? 'PDF' : isLink ? 'LINK' : 'NOTE'}
               </span>
               <h1 className="font-bold text-xs sm:text-sm text-white truncate max-w-xs sm:max-w-md lg:max-w-lg">
-                {file.name.replace(/\.(pdf|html)$/i, '')}
+                {displayName}
               </h1>
+              <div className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-800 text-cyan-400 border border-slate-700 text-[11px] font-semibold shrink-0" title="Verified reading count">
+                <Eye className="w-3 h-3 text-cyan-400" />
+                <span className="font-mono">{file.viewsCount || 0} reads</span>
+              </div>
             </div>
             {(file.subject || file.branch) && (
               <span className="text-[11px] text-slate-400 truncate block">
@@ -280,8 +752,8 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
         {/* Right: Controls & Actions */}
         <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           
-          {/* HTML Theme Selector (Standard mode) */}
-          {(!isPdf && !isYoutube) && (
+          {/* HTML Theme Selector (Portrait Mode) */}
+          {!isPdf && (
             <div className="hidden sm:flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700">
               <button
                 onClick={() => setTheme('light')}
@@ -318,13 +790,13 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
             <ExternalLink className="w-4 h-4" />
           </a>
 
-          {/* Download Direct */}
+          {/* Download A4 PDF */}
           <button
             onClick={handleDownload}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Download Study Material"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center space-x-1"
+            title="Download Proper A4 PDF"
           >
-            {isDownloading ? <span className="animate-pulse">...</span> : <Download className="w-4 h-4" />}
+            {isDownloading ? <span className="animate-pulse text-xs font-bold text-cyan-400">PDF...</span> : <Download className="w-4 h-4" />}
           </button>
 
           {/* Share */}
@@ -366,12 +838,17 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
         </div>
       )}
 
-      {/* MAIN READING CANVAS */}
-      <main className="flex-1 overflow-auto bg-slate-950 p-2 sm:p-4 flex items-center justify-center">
-        
-        {/* PDF VIEWING MODE (Dynamic native PDF embed) */}
-        
-        
+      {/* MAIN READING CANVAS (Supports Touch Pinch-to-Zoom & Strict Landscape) */}
+      <main
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
+        className={`study-viewer-main flex-1 overflow-auto bg-slate-950 p-2 sm:p-4 flex items-center justify-center ${
+          theme === 'dark' ? 'theme-dark' : theme === 'sepia' ? 'theme-sepia' : 'theme-light'
+        }`}
+        style={{ touchAction: 'pan-x pan-y' }}
+      >
         {isLink ? (
           <div className="w-full h-full max-w-2xl flex flex-col items-center justify-center p-6 text-center">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 w-full max-w-md space-y-6 flex flex-col items-center">
@@ -395,25 +872,9 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
               </a>
             </div>
           </div>
-        ) : isYoutube ? (
-
-          <div className="w-full h-full max-w-5xl flex flex-col items-center justify-center p-2 sm:p-6">
-            <div className="w-full aspect-video rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-black">
-              <iframe
-                src={file.fileUrl?.includes('watch?v=') 
-                  ? file.fileUrl.replace('watch?v=', 'embed/').split('&')[0] 
-                  : file.fileUrl}
-                title={file.name}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-0"
-              />
-            </div>
-          </div>
         ) : isPdf ? (
-
           <div
-            className="w-full h-full max-w-5xl flex flex-col items-center justify-center transition-transform duration-200"
+            className="study-pdf-wrapper w-full h-full max-w-5xl flex flex-col items-center justify-center transition-transform duration-200"
             style={{
               transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
               transformOrigin: 'center center'
@@ -445,9 +906,9 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
             )}
           </div>
         ) : (
-          /* STANDARD HTML MODE */
+          /* STANDARD HTML STUDY NOTE MODE (100% in landscape, themeable, pinch-to-zoomable) */
           <div
-            className={`w-full max-w-4xl h-full rounded-2xl shadow-2xl p-6 sm:p-10 transition-colors border overflow-y-auto ${
+            className={`study-material-wrapper w-full max-w-4xl h-full rounded-2xl shadow-2xl p-6 sm:p-10 transition-colors border overflow-y-auto ${
               theme === 'light'
                 ? 'bg-white text-slate-900 border-slate-200'
                 : theme === 'sepia'
@@ -478,12 +939,12 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
 
       </main>
 
-      {/* BOTTOM TOOLBAR */}
-      <footer className="h-14 sm:h-16 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-lg">
+      {/* BOTTOM TOOLBAR (Only visible in Portrait Mode) */}
+      <footer className="study-viewer-footer h-14 sm:h-16 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-lg">
         
         {/* Left: Font Size or Info */}
         <div className="flex items-center space-x-2">
-          {(!isPdf && !isYoutube && !isLink) ? (
+          {!isPdf ? (
             <div className="flex items-center space-x-1.5 bg-slate-800 rounded-xl p-1 border border-slate-700 text-xs">
               <button
                 onClick={() => setFontSize(s => Math.max(s - 2, 12))}
@@ -513,7 +974,7 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
           <button
             onClick={handleZoomOut}
             className="p-1.5 rounded-lg text-slate-300 hover:text-white cursor-pointer"
-            title="Zoom Out"
+            title="Zoom Out (or Pinch on Screen)"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -525,7 +986,7 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
           <button
             onClick={handleZoomIn}
             className="p-1.5 rounded-lg text-slate-300 hover:text-white cursor-pointer"
-            title="Zoom In"
+            title="Zoom In (or Pinch on Screen)"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
@@ -546,6 +1007,7 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
           <button
             onClick={toggleFullscreen}
             className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-slate-950 flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer"
+            title="Toggle Landscape Fullscreen"
           >
             <Maximize className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{isFullscreen ? 'Exit Fullscreen' : 'Full-Screen View'}</span>

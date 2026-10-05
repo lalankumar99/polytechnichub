@@ -4,10 +4,6 @@ import fs from 'fs';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import { storage, UPLOADS_PATH } from './server/storage';
-import { ensureSamplePdfExists, generateValidNotePdf } from './server/samplePdf';
-
-// Ensure sample PDF is available
-ensureSamplePdfExists(UPLOADS_PATH);
 
 const app = express();
 const PORT = 3000;
@@ -103,7 +99,34 @@ app.get('/api/files/:id', async (req, res) => {
 
     await storage.incrementDownloads(item.id);
 
-    // If file is stored on disk
+    // If external link or video
+    if (item.fileUrl && (item.fileUrl.startsWith('http://') || item.fileUrl.startsWith('https://'))) {
+      return res.redirect(item.fileUrl);
+    }
+
+    // Retrieve file data or content (from memory or Firestore)
+    const fileDataObj = await storage.getFileFullData(item.id);
+    const htmlContent = fileDataObj?.content || item.content;
+    const base64Data = fileDataObj?.fileData || item.fileData;
+
+    // 1. If content is embedded HTML
+    if (htmlContent) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(item.name)}"`);
+      return res.send(htmlContent);
+    }
+
+    // 2. If fileData is stored in Firestore (base64)
+    if (base64Data) {
+      const cleanBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const isPdf = item.type === 'pdf' || item.name.toLowerCase().endsWith('.pdf');
+      res.setHeader('Content-Type', isPdf ? 'application/pdf' : 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(item.name)}"`);
+      return res.send(buffer);
+    }
+
+    // 3. If file is cached on disk
     if (item.fileUrl && item.fileUrl.startsWith('/uploads/')) {
       const diskFilename = path.basename(item.fileUrl);
       const filePath = path.join(UPLOADS_PATH, diskFilename);
@@ -118,35 +141,86 @@ app.get('/api/files/:id', async (req, res) => {
       }
     }
 
-    // If content is embedded HTML
-    if (item.type === 'html' && item.content) {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.send(item.content);
-    }
-
-    // Dynamic generation for seeded PDF item if no disk file uploaded
-    if (item.type === 'pdf') {
-      const pdfBuffer = generateValidNotePdf(
-        item.name,
-        `Branch: ${item.branch || 'Polytechnic Engineering'} | Subject: ${item.subject || item.name} | Semester: ${item.semester || 'Academic Year'}`,
-        [
-          item.description || 'Verified syllabus-aligned study notes published on POLYTECHNIC HUB.',
-          'Format: Certified Digital PDF Study Material',
-          'Document ID: ' + item.id,
-          'Branch/Discipline: ' + (item.branch || 'General Engineering'),
-          'Subject: ' + (item.subject || item.name),
-          'Unit/Module: ' + (item.unit || 'Standard Curriculum'),
-          'Verified by: POLYTECHNIC HUB Editorial & Faculty Panel'
-        ]
-      );
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(item.name)}"`);
-      return res.send(pdfBuffer);
-    }
-
+    // No default or dummy file generated!
     res.status(404).send('File content not available');
   } catch (err: any) {
     res.status(500).send('Error serving file: ' + err.message);
+  }
+});
+
+// Helper to extract Google Drive file ID from URLs or raw IDs
+function extractDriveFileId(input: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed) && !trimmed.includes('/') && !trimmed.includes('.')) {
+    return trimmed;
+  }
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) return fileDMatch[1];
+  const idParamMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParamMatch && idParamMatch[1]) return idParamMatch[1];
+  const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch && folderMatch[1]) return folderMatch[1];
+  return null;
+}
+
+// 4b. Stream Google Drive PDF without CORS / Drive headers
+app.get('/api/proxy/drive-pdf', async (req, res) => {
+  try {
+    const rawInput = (req.query.fileId as string) || (req.query.url as string) || '';
+    const fileId = extractDriveFileId(rawInput) || rawInput;
+
+    if (!fileId) {
+      return res.status(400).json({ error: 'Missing or invalid Google Drive file ID or URL' });
+    }
+
+    const driveDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const driveResp = await fetch(driveDownloadUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/pdf,*/*'
+      },
+      redirect: 'follow'
+    });
+
+    if (!driveResp.ok) {
+      return res.status(driveResp.status).send(`Failed to fetch PDF from Google Drive (${driveResp.status})`);
+    }
+
+    const contentType = driveResp.headers.get('content-type') || 'application/pdf';
+
+    // If Google returned a virus scan confirmation HTML page for large files:
+    if (contentType.includes('text/html')) {
+      const htmlText = await driveResp.text();
+      const confirmMatch = htmlText.match(/confirm=([a-zA-Z0-9_-]+)/) || htmlText.match(/name="confirm"\s+value="([a-zA-Z0-9_-]+)"/);
+      if (confirmMatch && confirmMatch[1]) {
+        const confirmedUrl = `https://drive.google.com/uc?export=download&confirm=${confirmMatch[1]}&id=${fileId}`;
+        const retryResp = await fetch(confirmedUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+          },
+          redirect: 'follow'
+        });
+        if (retryResp.ok) {
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Accept-Ranges', 'bytes');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          const arrayBuffer = await retryResp.arrayBuffer();
+          return res.send(Buffer.from(arrayBuffer));
+        }
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const arrayBuffer = await driveResp.arrayBuffer();
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (err: any) {
+    console.error('Error proxying Google Drive PDF:', err);
+    res.status(500).send('Proxy error: ' + err.message);
   }
 });
 
@@ -234,7 +308,7 @@ app.post('/api/admin/folders', adminAuthMiddleware, async (req, res) => {
 // 3. Create File Record (bypassing local disk multer)
 app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, type, parentId, status, size, fileUrl, description, branch, semester, isPremium } = req.body;
+    const { name, type, parentId, status, size, fileUrl, description, branch, semester, isPremium, displayType, isVideo, thumbnailUrl, videoTitle } = req.body;
     
     if (!name || !type || !fileUrl) {
       return res.status(400).json({ success: false, error: 'Name, type, and fileUrl are required' });
@@ -250,7 +324,11 @@ app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) 
       description,
       branch,
       semester,
-      isPremium
+      isPremium,
+      displayType,
+      isVideo: isVideo === true || isVideo === 'true' || type === 'youtube',
+      thumbnailUrl,
+      videoTitle
     });
     res.json({ success: true, file: fileItem });
   } catch (err: any) {
@@ -261,7 +339,7 @@ app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) 
 // 3. Upload file (PDF or HTML)
 app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async (req, res) => {
   try {
-    const { parentId, status, description, isPremium, accessType } = req.body;
+    const { parentId, status, description, isPremium, accessType, displayType, isVideo } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -272,11 +350,20 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async 
     const originalName = req.file.originalname;
 
     let content: string | undefined = undefined;
+    let fileData: string | undefined = undefined;
+
     if (type === 'html') {
       try {
         content = fs.readFileSync(req.file.path, 'utf-8');
       } catch (e) {
         console.error('Could not read HTML content:', e);
+      }
+    } else {
+      try {
+        const buf = fs.readFileSync(req.file.path);
+        fileData = buf.toString('base64');
+      } catch (e) {
+        console.error('Could not read binary file data:', e);
       }
     }
 
@@ -287,10 +374,13 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async 
       status: status === 'draft' ? 'draft' : 'published',
       size: req.file.size,
       fileUrl: `/uploads/${req.file.filename}`,
+      fileData,
       content,
       description,
       isPremium: isPremium === "true" || isPremium === true,
-      accessType
+      accessType,
+      displayType: displayType || (type === 'html' ? 'pdf' : type),
+      isVideo: isVideo === 'true' || isVideo === true
     });
 
     res.json({ success: true, file: fileItem });
@@ -302,7 +392,7 @@ app.post('/api/admin/upload', adminAuthMiddleware, upload.single('file'), async 
 // 4. Create HTML Note directly from text/markdown/HTML editor
 app.post('/api/admin/create-html-note', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, parentId, status, content, description, branch, semester, isPremium, accessType } = req.body;
+    const { name, parentId, status, content, description, branch, semester, isPremium, accessType, displayType, isVideo } = req.body;
     if (!name || !content) {
       return res.status(400).json({ success: false, error: 'Name and content are required' });
     }
@@ -321,10 +411,58 @@ app.post('/api/admin/create-html-note', adminAuthMiddleware, async (req, res) =>
       branch,
       semester,
       isPremium,
-      accessType
+      accessType,
+      displayType: displayType || 'pdf', // default masking as PDF for document notes
+      isVideo: isVideo === true || isVideo === 'true'
     });
 
     res.json({ success: true, file: fileItem });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Helper API: YouTube oEmbed Standard Info Fetcher
+app.get('/api/utils/youtube-oembed', async (req, res) => {
+  try {
+    const videoUrl = req.query.url as string;
+    if (!videoUrl) {
+      return res.status(400).json({ success: false, error: 'URL parameter is required' });
+    }
+
+    const regExp = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/;
+    const match = videoUrl.match(regExp);
+    const videoId = match ? match[1] : null;
+
+    let title = '';
+    let author = '';
+    let thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '';
+
+    try {
+      const oembedRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`);
+      if (oembedRes.ok) {
+        const oembedData: any = await oembedRes.json();
+        title = oembedData.title || '';
+        author = oembedData.author_name || '';
+        if (oembedData.thumbnail_url) {
+          thumbnailUrl = oembedData.thumbnail_url;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    if (videoId && !thumbnailUrl) {
+      thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+
+    res.json({
+      success: true,
+      videoId,
+      title,
+      author,
+      thumbnailUrl
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

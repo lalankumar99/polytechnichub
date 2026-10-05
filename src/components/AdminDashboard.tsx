@@ -1,5 +1,6 @@
 import { AdminPremiumManager } from './AdminPremiumManager';
 import React, { useState, useEffect, useMemo } from 'react';
+import { extractDriveFileId } from '../utils/googleDrive';
 import {
   MonitorPlay,
   Youtube,
@@ -34,7 +35,7 @@ import {
 } from 'lucide-react';
 import { StudyItem, LibraryStats, BreadcrumbItem } from '../types';
 import { api } from '../services/api';
-import { formatFileSize, formatDate } from '../utils/formatters';
+import { formatFileSize, formatDate, extractYoutubeId, getYoutubeThumbnailUrl } from '../utils/formatters';
 
 interface AdminDashboardProps {
   onOpenFile: (file: StudyItem) => void;
@@ -139,9 +140,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [htmlNoteDesc, setHtmlNoteDesc] = useState('');
   const [htmlNoteAccessType, setHtmlNoteAccessType] = useState<"free"|"premium"|"both">("both");
   const [htmlNoteIsPremium, setHtmlNoteIsPremium] = useState(false);
+  const [htmlNoteDisplayType, setHtmlNoteDisplayType] = useState<'pdf' | 'html' | 'video'>('pdf');
+  const [htmlNoteIsVideo, setHtmlNoteIsVideo] = useState(false);
+
+  const [uploadDisplayType, setUploadDisplayType] = useState<'pdf' | 'html' | 'video'>('pdf');
+  const [uploadIsVideo, setUploadIsVideo] = useState(false);
+
+  const [youtubeThumbnailUrl, setYoutubeThumbnailUrl] = useState('');
+  const [youtubeAuthor, setYoutubeAuthor] = useState('');
+  const [fetchingYoutube, setFetchingYoutube] = useState(false);
 
   const [renameValue, setRenameValue] = useState('');
   const [renameUrlValue, setRenameUrlValue] = useState('');
+  const [renameDisplayType, setRenameDisplayType] = useState<'pdf' | 'html' | 'video' | 'link'>('pdf');
+  const [renameIsVideo, setRenameIsVideo] = useState(false);
+  const [renameDesc, setRenameDesc] = useState('');
   const [selectedDestinationFolder, setSelectedDestinationFolder] = useState<string | null>(null);
 
   // Load Admin tree
@@ -220,27 +233,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Handlers
   
+  const handleFetchYoutubeInfo = async (urlToFetch?: string) => {
+    const targetUrl = urlToFetch || youtubeUrl;
+    if (!targetUrl || !targetUrl.trim()) return;
+    setFetchingYoutube(true);
+    try {
+      const data = await api.fetchYoutubeMetadata(targetUrl.trim());
+      if (data.title) {
+        setYoutubeName(data.title);
+      }
+      if (data.thumbnailUrl) {
+        setYoutubeThumbnailUrl(data.thumbnailUrl);
+      }
+      if (data.author) {
+        setYoutubeAuthor(data.author);
+      }
+    } catch (e) {
+      console.warn('Could not auto-fetch YouTube metadata:', e);
+    } finally {
+      setFetchingYoutube(false);
+    }
+  };
+
   const handleCreateYoutube = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!youtubeName.trim() || !youtubeUrl.trim() || !currentFolderId) return;
 
     setLoading(true);
     try {
+      const ytId = extractYoutubeId(youtubeUrl.trim());
+      const cleanUrl = ytId ? `https://www.youtube.com/watch?v=${ytId}` : youtubeUrl.trim();
+      const cleanThumbnail = youtubeThumbnailUrl || (ytId ? getYoutubeThumbnailUrl(cleanUrl) || undefined : undefined);
+
       await api.createFileRecord(
         youtubeName.trim(),
         'youtube',
-        youtubeUrl.trim(),
+        cleanUrl,
         0,
         currentFolderId,
         youtubeStatus,
         youtubeDesc.trim(),
         newFolderBranch,
-        newFolderSemester
+        newFolderSemester,
+        'video',
+        true,
+        cleanThumbnail,
+        youtubeName.trim()
       );
       setShowYoutubeModal(false);
       setYoutubeName('');
       setYoutubeUrl('');
       setYoutubeDesc('');
+      setYoutubeThumbnailUrl('');
+      setYoutubeAuthor('');
       triggerSuccess('YouTube video added successfully.');
       await loadAdminData();
     } catch (err: any) {
@@ -256,10 +301,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setLoading(true);
     try {
+      const trimmedUrl = linkUrl.trim();
+      const driveId = extractDriveFileId(trimmedUrl);
+      const isDriveOrPdf = !!driveId || trimmedUrl.toLowerCase().includes('.pdf');
+      const itemType = isDriveOrPdf ? 'pdf' : 'link';
+
       await api.createFileRecord(
         linkName.trim(),
-        'link',
-        linkUrl.trim(),
+        itemType,
+        trimmedUrl,
         0,
         currentFolderId,
         linkStatus,
@@ -271,7 +321,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setLinkName('');
       setLinkUrl('');
       setLinkDesc('');
-      triggerSuccess('Link added successfully.');
+      triggerSuccess(`${isDriveOrPdf ? 'Google Drive PDF / Document' : 'Link'} added successfully.`);
       await loadAdminData();
     } catch (err: any) {
       setError(err.message || 'Failed to add link');
@@ -304,34 +354,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setUploading(true);
     try {
-      // Import storage dynamically or at top. We will import at top.
-      const { storage } = await import('../firebase');
-      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-      
-      const fileRef = ref(storage, `study-materials/${Date.now()}_${uploadFileObj.name}`);
-      await uploadBytes(fileRef, uploadFileObj);
-      const fileUrl = await getDownloadURL(fileRef);
-
-      const ext = uploadFileObj.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'html';
-      
-      await api.createFileRecord(
-        uploadFileObj.name,
-        ext,
-        fileUrl,
-        uploadFileObj.size,
-        currentFolderId,
-        uploadStatus,
-        uploadDesc,
-        newFolderBranch,
-        newFolderSemester
-      );
+      const isHtml = uploadFileObj.name.toLowerCase().endsWith('.html') || uploadFileObj.name.toLowerCase().endsWith('.htm');
+      if (isHtml) {
+        const content = await uploadFileObj.text();
+        await api.createHtmlNote(
+          uploadFileObj.name,
+          content,
+          currentFolderId,
+          uploadStatus,
+          uploadDesc,
+          newFolderBranch,
+          newFolderSemester,
+          uploadDisplayType,
+          uploadIsVideo
+        );
+      } else {
+        await api.uploadFile(
+          uploadFileObj,
+          currentFolderId,
+          uploadStatus,
+          uploadDesc,
+          uploadIsPremium,
+          uploadDisplayType,
+          uploadIsVideo
+        );
+      }
       
       setShowUploadModal(false);
       setUploadFileObj(null);
       setUploadDesc('');
       setUploadIsPremium(false);
       setUploadAccessType("both");
-      triggerSuccess(`File "${uploadFileObj.name}" uploaded successfully (${uploadStatus}).`);
+      setUploadDisplayType('pdf');
+      setUploadIsVideo(false);
+      triggerSuccess(`File "${uploadFileObj.name}" uploaded successfully (Display Mask: ${uploadDisplayType.toUpperCase()}).`);
       await loadAdminData();
     } catch (err: any) {
       setError(err.message || 'File upload failed');
@@ -340,27 +396,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!youtubeName.trim() || !youtubeUrl.trim()) return;
+    if (!youtubeName.trim() || !youtubeUrl.trim() || !currentFolderId) return;
     setLoading(true);
     try {
+      const ytId = extractYoutubeId(youtubeUrl.trim());
+      const cleanUrl = ytId ? `https://www.youtube.com/watch?v=${ytId}` : youtubeUrl.trim();
+      const cleanThumbnail = youtubeThumbnailUrl || (ytId ? getYoutubeThumbnailUrl(cleanUrl) || undefined : undefined);
+
       await api.createFileRecord(
         youtubeName.trim(),
         'youtube',
-        youtubeUrl.trim(),
+        cleanUrl,
         0,
         currentFolderId,
         youtubeStatus,
-        youtubeDesc,
+        youtubeDesc.trim(),
         newFolderBranch,
-        newFolderSemester
+        newFolderSemester,
+        'video',
+        true,
+        cleanThumbnail,
+        youtubeName.trim()
       );
       setShowYoutubeModal(false);
       setYoutubeName('');
       setYoutubeUrl('');
       setYoutubeDesc('');
+      setYoutubeThumbnailUrl('');
+      setYoutubeAuthor('');
+      triggerSuccess('YouTube video added successfully.');
       await loadAdminData();
     } catch (err: any) {
       setError(err.message || 'Failed to add YouTube video');
@@ -374,17 +440,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!htmlNoteName.trim() || !htmlNoteContent.trim()) return;
 
     try {
-      await api.createHtmlNote(htmlNoteName.trim(), htmlNoteContent, currentFolderId, htmlNoteStatus, htmlNoteDesc, newFolderBranch, newFolderSemester);
+      await api.createHtmlNote(
+        htmlNoteName.trim(),
+        htmlNoteContent,
+        currentFolderId,
+        htmlNoteStatus,
+        htmlNoteDesc,
+        newFolderBranch,
+        newFolderSemester,
+        htmlNoteDisplayType,
+        htmlNoteIsVideo
+      );
       setShowCreateHtmlModal(false);
       setHtmlNoteName('');
       setHtmlNoteContent('');
       setHtmlNoteDesc('');
       setHtmlNoteIsPremium(false);
       setHtmlNoteAccessType("both");
-      triggerSuccess(`Interactive note "${htmlNoteName}" created successfully.`);
+      setHtmlNoteDisplayType('pdf');
+      setHtmlNoteIsVideo(false);
+      triggerSuccess(`Study note "${htmlNoteName}" created successfully (Display Mask: ${htmlNoteDisplayType.toUpperCase()}).`);
       await loadAdminData();
     } catch (err: any) {
-      setError(err.message || 'Could not save HTML note');
+      setError(err.message || 'Could not create note');
     }
   };
 
@@ -403,19 +481,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     if (!renameItem || !renameValue.trim()) return;
 
-    let finalName = renameValue.trim();
-    // Maintain extension if renaming a file
-    
-    
+    const finalName = renameValue.trim();
 
     try {
-      await api.updateItem(renameItem.id, { name: finalName, ...(renameItem.type === 'youtube' || renameItem.type === 'link' ? { fileUrl: renameUrlValue.trim() } : {}) });
+      await api.updateItem(renameItem.id, { 
+        name: finalName, 
+        description: renameDesc.trim(),
+        ...(renameItem.type !== 'folder' ? {
+          displayType: renameDisplayType,
+          isVideo: renameIsVideo
+        } : {}),
+        ...(renameItem.type === 'youtube' || renameItem.type === 'link' ? { fileUrl: renameUrlValue.trim() } : {}) 
+      });
       setRenameItem(null);
       setRenameValue('');
-      triggerSuccess(`Item renamed to "${finalName}".`);
+      setRenameDesc('');
+      triggerSuccess(`"${finalName}" updated successfully.`);
       await loadAdminData();
     } catch (err: any) {
-      setError(err.message || 'Rename failed');
+      setError(err.message || 'Update failed');
     }
   };
 
@@ -584,12 +668,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <span className="text-2xl font-black text-slate-900 font-mono mt-1 block">{stats?.totalFiles ?? 0}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-slate-500 font-semibold block">Files</span>
-          <span className="text-2xl font-black text-rose-600 font-mono mt-1 block">{stats?.totalFiles ?? 0}</span>
+          <span className="text-xs text-slate-500 font-semibold block">Total Reads / Views</span>
+          <span className="text-2xl font-black text-blue-600 font-mono mt-1 block">{stats?.totalViews ?? 0}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-slate-500 font-semibold block">Study Guides</span>
-          <span className="text-2xl font-black text-emerald-600 font-mono mt-1 block">{stats?.totalFiles ?? 0}</span>
+          <span className="text-xs text-slate-500 font-semibold block">Videos</span>
+          <span className="text-2xl font-black text-red-600 font-mono mt-1 block">{stats?.totalYoutubeVideos ?? 0}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 shadow-sm">
           <span className="text-xs text-emerald-700 font-semibold block">Published (Public)</span>
@@ -768,17 +852,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </td>
 
-                      {/* Type */}
-                      <td className="py-3 px-3 font-mono uppercase text-[11px]">
-                        <span className={`px-2 py-0.5 rounded font-bold ${
-                          isFolder
-                            ? 'bg-blue-50 text-blue-700'
-                            : isPdf
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}>
-                          {item.type}
-                        </span>
+                      {/* Type & Mask */}
+                      <td className="py-3 px-3 text-[11px]">
+                        <div className="flex flex-col gap-0.5 items-start">
+                          <span className={`px-2 py-0.5 rounded font-extrabold uppercase ${
+                            isFolder
+                              ? 'bg-blue-100 text-blue-700'
+                              : item.isVideo || item.type === 'youtube'
+                              ? 'bg-red-100 text-red-700'
+                              : (item.displayType === 'pdf' || item.type === 'pdf')
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-indigo-100 text-indigo-700'
+                          }`}>
+                            {isFolder ? 'FOLDER' : item.isVideo || item.type === 'youtube' ? 'VIDEO' : (item.displayType === 'pdf' || item.type === 'pdf') ? 'MASK: PDF' : 'HTML NOTE'}
+                          </span>
+                          {!isFolder && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              raw: {item.type} • {item.viewsCount || 0} reads
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
@@ -832,15 +925,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Rename */}
+                          {/* Edit / Rename */}
                           <button
                             onClick={() => {
                               setRenameItem(item);
                               setRenameValue(item.name);
                               setRenameUrlValue(item.fileUrl || '');
+                              setRenameDisplayType(item.displayType || (item.isVideo || item.type === 'youtube' ? 'video' : (item.type === 'html' ? 'html' : 'pdf')));
+                              setRenameIsVideo(!!item.isVideo);
+                              setRenameDesc(item.description || '');
                             }}
                             className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                            title="Rename"
+                            title="Edit details & masking"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
@@ -1025,6 +1121,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </select>
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Display Mask (Presented to Students)</label>
+                <select 
+                  value={uploadDisplayType}
+                  onChange={(e) => setUploadDisplayType(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                >
+                  <option value="pdf">Mask as PDF Document (.pdf) [Recommended]</option>
+                  <option value="html">Interactive HTML Note (.html)</option>
+                  <option value="video">Video Resource</option>
+                </select>
+                <p className="text-[11px] text-slate-400">Content is processed internally as HTML, but end-users see this masked format.</p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="upload-is-video"
+                  checked={uploadIsVideo}
+                  onChange={(e) => setUploadIsVideo(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer"
+                />
+                <label htmlFor="upload-is-video" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Designate upload as "Video"
+                </label>
+              </div>
+
               <div className="mt-4 mb-2">
                 <label className="text-xs font-bold text-slate-700 block mb-1">Target Audience</label>
                 <select value={uploadAccessType} onChange={e => setUploadAccessType(e.target.value as any)} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 focus:bg-white text-sm">
@@ -1167,7 +1290,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
             
-            <form onSubmit={handleYoutubeSubmit} className="space-y-4">
+            <form onSubmit={handleCreateYoutube} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">YouTube Video URL</label>
+                <div className="flex space-x-2">
+                  <input 
+                    type="url" 
+                    value={youtubeUrl} 
+                    onChange={e => {
+                      setYoutubeUrl(e.target.value);
+                      if (e.target.value.includes('youtu')) {
+                        handleFetchYoutubeInfo(e.target.value);
+                      }
+                    }}
+                    onBlur={() => handleFetchYoutubeInfo()}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleFetchYoutubeInfo()}
+                    disabled={fetchingYoutube || !youtubeUrl.trim()}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 shrink-0 border border-red-200 disabled:opacity-50"
+                    title="Auto-fetch video title & thumbnail from YouTube oEmbed"
+                  >
+                    {fetchingYoutube ? 'Fetching...' : 'Auto-Fetch'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">Title & high-res thumbnail will be fetched via YouTube oEmbed standard.</p>
+              </div>
+
+              {/* YouTube Thumbnail Preview */}
+              {youtubeThumbnailUrl && (
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-950 relative shadow-sm">
+                  <img 
+                    src={youtubeThumbnailUrl} 
+                    alt="YouTube Video Thumbnail" 
+                    className="w-full h-36 object-cover" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2.5">
+                    <span className="text-white text-xs font-bold line-clamp-1">{youtubeName || 'YouTube Video'}</span>
+                    {youtubeAuthor && <span className="text-slate-300 text-[10px]">{youtubeAuthor}</span>}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Video Title</label>
                 <input 
@@ -1181,14 +1349,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">URL (YouTube or Link)</label>
-                <input 
-                  type="url" 
-                  value={youtubeUrl} 
-                  onChange={e => setYoutubeUrl(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none"
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  required
+                <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                <textarea 
+                  value={youtubeDesc}
+                  onChange={e => setYoutubeDesc(e.target.value)}
+                  placeholder="Video summary or lecture outline..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none"
                 />
               </div>
 
@@ -1249,10 +1416,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="text"
                   value={htmlNoteName}
                   onChange={(e) => setHtmlNoteName(e.target.value)}
-                  placeholder="e.g. Thevenin Theorem Interactive Guide.html"
+                  placeholder="e.g. Thevenin Theorem Interactive Guide"
                   required
                   className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block mb-1">Display Mask (Presented to Students)</label>
+                <select
+                  value={htmlNoteDisplayType}
+                  onChange={e => setHtmlNoteDisplayType(e.target.value as any)}
+                  className="w-full p-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                >
+                  <option value="pdf">Mask as PDF Document (.pdf) [Recommended]</option>
+                  <option value="html">Interactive HTML Note (.html)</option>
+                  <option value="video">Video Resource</option>
+                </select>
+                <p className="text-[11px] text-slate-400">Stores as clean HTML internally, but presents with the chosen extension & badge to students.</p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="html-is-video"
+                  checked={htmlNoteIsVideo}
+                  onChange={e => setHtmlNoteIsVideo(e.target.checked)}
+                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <label htmlFor="html-is-video" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Designate as "Video" resource
+                </label>
               </div>
 
               <div>
@@ -1313,15 +1507,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 4: RENAME ITEM */}
+      {/* MODAL 4: EDIT ITEM & DYNAMIC MASKING */}
       {/* ========================================================================= */}
       {renameItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
-            <h3 className="font-bold text-base text-slate-900">Rename Item</h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900">
+                {renameItem.type === 'folder' ? 'Edit Folder' : 'Edit Item & Masking'}
+              </h3>
+              <button onClick={() => setRenameItem(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <form onSubmit={handleRenameSubmit} className="space-y-4">
               <div>
-                <label className="text-xs text-slate-600 block mb-1">New Name</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  {renameItem.type === 'folder' ? 'Folder Name' : 'Item Title / Name'}
+                </label>
                 <input
                   type="text"
                   value={renameValue}
@@ -1331,9 +1534,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              {renameItem.type !== 'folder' && (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Display Mask (Presented to Students)
+                    </label>
+                    <select
+                      value={renameDisplayType}
+                      onChange={(e) => setRenameDisplayType(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="pdf">Mask as PDF Document (.pdf) [Recommended]</option>
+                      <option value="html">Interactive HTML Note (.html)</option>
+                      <option value="video">Video Resource</option>
+                      <option value="link">Web Link</option>
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Uploaded content is processed as HTML, but presented to end-users with this dynamic mask.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="rename-is-video"
+                      checked={renameIsVideo}
+                      onChange={(e) => setRenameIsVideo(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="rename-is-video" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                      Designate as "Video"
+                    </label>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Description (Optional)</label>
+                <textarea
+                  value={renameDesc}
+                  onChange={(e) => setRenameDesc(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Summary or note details..."
+                />
+              </div>
+
               {(renameItem?.type === 'youtube' || renameItem?.type === 'link') && (
                 <div>
-                  <label className="text-xs text-slate-600 block mb-1">URL</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">URL</label>
                   <input
                     type="url"
                     value={renameUrlValue}
@@ -1343,7 +1594,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
               )}
-              <div className="flex items-center justify-end space-x-2">
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setRenameItem(null)}
@@ -1355,7 +1607,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-500"
                 >
-                  Save Rename
+                  Save Changes
                 </button>
               </div>
             </form>

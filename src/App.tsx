@@ -9,7 +9,8 @@ import About from './components/About';
 import { BrowseView } from './components/BrowseView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { StudyViewer } from './components/StudyViewer';
-import { ViewingRequirementModal } from './components/ViewingRequirementModal';
+import { DrivePdfViewer } from './components/DrivePdfViewer';
+import { DriveReaderModal } from './components/DriveReaderModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { api, authState } from './services/api';
@@ -38,6 +39,8 @@ export default function App() {
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
   const [showPremiumPortal, setShowPremiumPortal] = useState(false);
+  const [showDriveReaderModal, setShowDriveReaderModal] = useState<boolean>(false);
+  const [activeDriveSource, setActiveDriveSource] = useState<{ source: string; title?: string } | null>(null);
   const [premiumUser, setPremiumUser] = useState<any>(() => {
     try {
       const stored = localStorage.getItem('polytechnic_premium_user');
@@ -128,7 +131,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // When student clicks any PDF or HTML note -> trigger Requirement Screen
+  // Directly open file or video without any permission prompt
   const handleInitiateOpenFile = (file: StudyItem) => {
     if (file.isPremium) {
       if (!premiumUser || premiumUser.status !== 'approved') {
@@ -136,21 +139,41 @@ export default function App() {
         return;
       }
     }
-    setSelectedFileForRequirement(file);
-  };
 
-  // When user clicks "Open Full Screen & Landscape" or "Continue Standard"
-  const handleProceedToViewer = (preferFullscreen: boolean) => {
-    if (!selectedFileForRequirement) return;
-    const fileToOpen = selectedFileForRequirement;
-    setSelectedFileForRequirement(null);
-    setInitialFullscreenPref(preferFullscreen);
+    const isVideo = file.type === 'youtube' || file.isVideo || (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be')));
+    if (isVideo) {
+      try {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen({ navigationUI: 'hide' } as any).catch(() => {});
+        } else if ((document.documentElement as any).webkitRequestFullscreen) {
+          (document.documentElement as any).webkitRequestFullscreen();
+        }
+      } catch (e) {}
+
+      try {
+        if (screen.orientation && (screen.orientation as any).lock) {
+          (screen.orientation as any).lock('landscape').catch(() => {
+            if ((screen.orientation as any).lock) {
+              (screen.orientation as any).lock('landscape-primary').catch(() => {});
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    const fileToOpen = { ...file };
+    setInitialFullscreenPref(true);
+
+    // Register authentic reading/view in backend Firestore database
+    api.getPublicItem(fileToOpen.id).catch(err => console.error('Failed to increment view:', err));
+    fileToOpen.viewsCount = (fileToOpen.viewsCount || 0) + 1;
+
     setActiveViewingFile(fileToOpen);
   };
 
   const handleCloseViewer = () => {
     setActiveViewingFile(null);
-    loadPublicData(); // Refresh views count
+    loadPublicData(); // Refresh views count across library
   };
 
   const handleLogout = () => {
@@ -194,6 +217,7 @@ export default function App() {
           localStorage.removeItem('polytechnic_premium_user');
           setPremiumUser(null);
         }}
+        onOpenDriveReader={() => setShowDriveReaderModal(true)}
       />
 
       {/* Main Content Area */}
@@ -204,6 +228,7 @@ export default function App() {
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenFile={handleInitiateOpenFile}
             onOpenPremiumCourse={handleOpenPremiumCourse}
+            onOpenDriveReader={() => setShowDriveReaderModal(true)}
             stats={publicStats}
             items={filteredItems}
           />
@@ -240,16 +265,7 @@ export default function App() {
         />
       </div>
 
-      {/* Requirement Screen ("Better Learning Experience" modal) */}
-      {selectedFileForRequirement && (
-        <ViewingRequirementModal
-          file={selectedFileForRequirement}
-          onProceed={handleProceedToViewer}
-          onClose={() => setSelectedFileForRequirement(null)}
-        />
-      )}
-
-      {/* Immersive Study Viewer (PDF & HTML) */}
+      {/* Immersive Study Viewer (PDF, HTML & Video) */}
       {activeViewingFile && (
         <StudyViewer
           file={activeViewingFile}
@@ -257,6 +273,25 @@ export default function App() {
           initialFullscreen={initialFullscreenPref}
         />
       )}
+
+      {/* Google Drive PDF Fullscreen Viewer */}
+      {activeDriveSource && (
+        <DrivePdfViewer
+          driveSource={activeDriveSource.source}
+          title={activeDriveSource.title}
+          onClose={() => setActiveDriveSource(null)}
+          autoFullscreen={true}
+        />
+      )}
+
+      {/* Google Drive Reader Input Modal */}
+      <DriveReaderModal
+        isOpen={showDriveReaderModal}
+        onClose={() => setShowDriveReaderModal(false)}
+        onLaunchViewer={(source, title) => {
+          setActiveDriveSource({ source, title });
+        }}
+      />
 
       
       {/* Premium Student Portal (Login/Register) */}

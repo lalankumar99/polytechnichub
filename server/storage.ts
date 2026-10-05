@@ -1,7 +1,18 @@
 import { StudyItem, LibraryStats, PremiumCourse, PremiumItem, PremiumAccessRequest, FeedbackSubmission } from '../src/types';
 import fs from 'fs';
 import path from 'path';
-import { INITIAL_ITEMS } from './initialData';
+import { initializeApp, getApps } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  doc, 
+  getDoc,
+  setDoc, 
+  deleteDoc, 
+  updateDoc
+} from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -10,6 +21,14 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 export const UPLOADS_PATH = UPLOADS_DIR;
 
 const DB_FILE = path.join(UPLOADS_DIR, 'library_db.json');
+
+// Initialize Firebase App & Firestore with provisioned Database ID
+const firebaseApp = getApps().find(a => a.name === '[DEFAULT]') || initializeApp(firebaseConfig);
+const firestoreDb = (firebaseConfig as any).firestoreDatabaseId 
+  ? getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId)
+  : getFirestore(firebaseApp);
+
+export { firestoreDb as db };
 
 interface DatabaseSchema {
   studyItems: StudyItem[];
@@ -24,20 +43,44 @@ interface DatabaseSchema {
   };
 }
 
+/**
+ * Remove any undefined values recursively so Firestore setDoc does not throw
+ */
+function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+        result[key] = sanitizeForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
 class LibraryStorage {
   private data: DatabaseSchema;
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
-    this.data = this.loadDatabase();
+    this.data = this.loadDiskCache();
+    this.initPromise = this.syncFromFirestore();
   }
 
-  private loadDatabase(): DatabaseSchema {
+  /**
+   * Load from local disk cache if available.
+   * STRICT: NO DEFAULT / DUMMY FILES.
+   */
+  private loadDiskCache(): DatabaseSchema {
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         return {
-          studyItems: Array.isArray(parsed.studyItems) && parsed.studyItems.length > 0 ? parsed.studyItems : [...INITIAL_ITEMS],
+          studyItems: Array.isArray(parsed.studyItems) ? parsed.studyItems : [],
           premiumUsers: Array.isArray(parsed.premiumUsers) ? parsed.premiumUsers : [],
           premiumCourses: Array.isArray(parsed.premiumCourses) ? parsed.premiumCourses : [],
           premiumItems: Array.isArray(parsed.premiumItems) ? parsed.premiumItems : [],
@@ -47,11 +90,11 @@ class LibraryStorage {
         };
       }
     } catch (err) {
-      console.error('[Storage] Error reading database file, initializing with defaults:', err);
+      console.error('[Storage] Error reading cache file:', err);
     }
 
-    const initialData: DatabaseSchema = {
-      studyItems: [...INITIAL_ITEMS],
+    return {
+      studyItems: [],
       premiumUsers: [],
       premiumCourses: [],
       premiumItems: [],
@@ -59,16 +102,90 @@ class LibraryStorage {
       feedback: [],
       studiverse: { liveEmbed: '', videos: [] }
     };
-    this.saveDatabase(initialData);
-    return initialData;
   }
 
-  private saveDatabase(dataToSave?: DatabaseSchema): void {
+  private saveDiskCache(): void {
     try {
-      const data = dataToSave || this.data;
-      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (err) {
-      console.error('[Storage] Error persisting database file:', err);
+      console.error('[Storage] Error persisting cache file:', err);
+    }
+  }
+
+  /**
+   * Synchronize all data permanently from Firestore
+   */
+  public async syncFromFirestore(): Promise<void> {
+    try {
+      console.log('[Storage] Connecting to Firestore database:', (firebaseConfig as any).firestoreDatabaseId);
+
+      const [itemsSnap, coursesSnap, pItemsSnap, pUsersSnap, reqSnap, fbSnap] = await Promise.all([
+        getDocs(collection(firestoreDb, 'studyItems')),
+        getDocs(collection(firestoreDb, 'premiumCourses')),
+        getDocs(collection(firestoreDb, 'premiumItems')),
+        getDocs(collection(firestoreDb, 'premiumUsers')),
+        getDocs(collection(firestoreDb, 'premiumRequests')),
+        getDocs(collection(firestoreDb, 'feedback'))
+      ]);
+
+      const itemsList: StudyItem[] = [];
+      itemsSnap.forEach(docSnap => {
+        itemsList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.studyItems = itemsList;
+      console.log(`[Storage] Synced ${itemsList.length} items from Firestore`);
+
+      const coursesList: PremiumCourse[] = [];
+      coursesSnap.forEach(docSnap => {
+        coursesList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.premiumCourses = coursesList;
+
+      const pItemsList: PremiumItem[] = [];
+      pItemsSnap.forEach(docSnap => {
+        pItemsList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.premiumItems = pItemsList;
+
+      const pUsersList: any[] = [];
+      pUsersSnap.forEach(docSnap => {
+        pUsersList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.premiumUsers = pUsersList;
+
+      const reqList: PremiumAccessRequest[] = [];
+      reqSnap.forEach(docSnap => {
+        reqList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.premiumRequests = reqList;
+
+      const fbList: FeedbackSubmission[] = [];
+      fbSnap.forEach(docSnap => {
+        fbList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      this.data.feedback = fbList;
+
+      // Studiverse doc
+      try {
+        const studiverseDoc = await getDoc(doc(firestoreDb, 'settings', 'studiverse'));
+        if (studiverseDoc.exists()) {
+          this.data.studiverse = studiverseDoc.data() as any;
+        }
+      } catch (e) {
+        // settings collection optional
+      }
+
+      this.isInitialized = true;
+      this.saveDiskCache();
+    } catch (err: any) {
+      console.error('[Storage] Error during Firestore sync:', err.message || err);
+      this.isInitialized = true;
+    }
+  }
+
+  public async ensureReady(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
     }
   }
 
@@ -77,11 +194,13 @@ class LibraryStorage {
   }
 
   public async getAllAdminItems(): Promise<StudyItem[]> {
+    await this.ensureReady();
     const items = this.getItems();
     return items.map(item => this.enrichItem(item, items));
   }
 
   public async getPublishedItems(): Promise<StudyItem[]> {
+    await this.ensureReady();
     const items = this.getItems();
 
     const isAncestorPublished = (item: StudyItem): boolean => {
@@ -113,8 +232,24 @@ class LibraryStorage {
   }
 
   public async getItemById(id: string): Promise<StudyItem | undefined> {
+    await this.ensureReady();
     const items = this.getItems();
-    const item = items.find(i => i.id === id);
+    let item = items.find(i => i.id === id);
+    
+    // If not found in memory, try fetching directly from Firestore
+    if (!item) {
+      try {
+        const snap = await getDoc(doc(firestoreDb, 'studyItems', id));
+        if (snap.exists()) {
+          item = { id: snap.id, ...(snap.data() as any) };
+          this.data.studyItems.push(item);
+          this.saveDiskCache();
+        }
+      } catch (err) {
+        console.error('[Storage] Error fetching single item from Firestore:', err);
+      }
+    }
+
     return item ? this.enrichItem(item, items) : undefined;
   }
 
@@ -122,7 +257,12 @@ class LibraryStorage {
     const item = this.data.studyItems.find(i => i.id === id);
     if (item) {
       item.viewsCount = (item.viewsCount || 0) + 1;
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'studyItems', id), { viewsCount: item.viewsCount });
+      } catch (e) {
+        // silent update fallback
+      }
     }
   }
 
@@ -130,11 +270,17 @@ class LibraryStorage {
     const item = this.data.studyItems.find(i => i.id === id);
     if (item) {
       item.downloadsCount = (item.downloadsCount || 0) + 1;
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'studyItems', id), { downloadsCount: item.downloadsCount });
+      } catch (e) {
+        // silent update fallback
+      }
     }
   }
 
   public async getBreadcrumbs(itemId: string | null): Promise<Array<{ id: string | null; name: string }>> {
+    await this.ensureReady();
     const items = this.getItems();
     const crumbs: Array<{ id: string | null; name: string }> = [{ id: null, name: 'Library' }];
     if (!itemId) return crumbs;
@@ -162,6 +308,7 @@ class LibraryStorage {
     isPremium?: boolean;
     accessType?: "free" | "premium" | "both";
   }): Promise<StudyItem> {
+    await this.ensureReady();
     const items = this.getItems();
     let branch: string = data.branch || 'General';
     let semester: string = data.semester || 'All Semesters';
@@ -200,24 +347,41 @@ class LibraryStorage {
     };
 
     this.data.studyItems.push(newFolder);
-    this.saveDatabase();
+    this.saveDiskCache();
+
+    // Permanently save to Firestore
+    try {
+      await setDoc(doc(firestoreDb, 'studyItems', newFolder.id), sanitizeForFirestore(newFolder));
+      console.log(`[Storage] Folder "${newFolder.name}" saved permanently in Firestore`);
+    } catch (err: any) {
+      console.error('[Storage] Error saving folder to Firestore:', err);
+    }
+
     return this.enrichItem(newFolder, this.data.studyItems);
   }
 
   public async createFile(data: {
     name: string;
-    type: 'pdf' | 'html';
+    type: 'pdf' | 'html' | 'youtube' | 'link';
     parentId: string | null;
     status?: 'published' | 'draft';
     size: number;
     fileUrl?: string;
+    fileData?: string;
     content?: string;
     description?: string;
     branch?: string;
     semester?: string;
     isPremium?: boolean;
     accessType?: "free" | "premium" | "both";
+    displayType?: 'pdf' | 'html' | 'video' | 'link';
+    maskedExtension?: string;
+    isVideo?: boolean;
+    thumbnailUrl?: string;
+    videoTitle?: string;
+    videoAuthor?: string;
   }): Promise<StudyItem> {
+    await this.ensureReady();
     const items = this.getItems();
     let branch: string = data.branch || 'General';
     let semester: string = data.semester || 'All Semesters';
@@ -237,15 +401,52 @@ class LibraryStorage {
       }
     }
 
+    const newId = 'file-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    
+    // Check if fileData is large (> 700KB) and needs chunking
+    let chunksCount: number | undefined = undefined;
+    let storedFileData: string | undefined = data.fileData;
+
+    if (data.fileData && data.fileData.length > 700000) {
+      const CHUNK_SIZE = 500000;
+      const totalChunks = Math.ceil(data.fileData.length / CHUNK_SIZE);
+      chunksCount = totalChunks;
+      storedFileData = undefined; // Don't store large blob in parent doc
+      
+      // Save chunks in background / async
+      (async () => {
+        try {
+          for (let i = 0; i < totalChunks; i++) {
+            const chunkStr = data.fileData!.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+            await setDoc(doc(firestoreDb, 'studyItems', newId, 'chunks', i.toString()), {
+              index: i,
+              data: chunkStr
+            });
+          }
+          console.log(`[Storage] Saved ${totalChunks} chunks to Firestore for file ${newId}`);
+        } catch (e) {
+          console.error('[Storage] Error saving chunks to Firestore:', e);
+        }
+      })();
+    }
+
     const newFile: StudyItem = {
-      id: 'file-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      id: newId,
       name: data.name.trim(),
       type: data.type,
       parentId: data.parentId || null,
       status: data.status || 'published',
       size: data.size || 0,
       fileUrl: data.fileUrl,
+      fileData: storedFileData,
+      chunksCount,
       content: data.content,
+      displayType: data.displayType,
+      maskedExtension: data.maskedExtension,
+      isVideo: data.isVideo,
+      thumbnailUrl: data.thumbnailUrl,
+      videoTitle: data.videoTitle,
+      videoAuthor: data.videoAuthor,
       isPremium,
       accessType,
       branch,
@@ -260,11 +461,45 @@ class LibraryStorage {
     };
 
     this.data.studyItems.push(newFile);
-    this.saveDatabase();
+    this.saveDiskCache();
+
+    // Permanently save to Firestore
+    try {
+      await setDoc(doc(firestoreDb, 'studyItems', newFile.id), sanitizeForFirestore(newFile));
+      console.log(`[Storage] File "${newFile.name}" saved permanently in Firestore`);
+    } catch (err: any) {
+      console.error('[Storage] Error saving file to Firestore:', err);
+    }
+
     return this.enrichItem(newFile, this.data.studyItems);
   }
 
+  public async getFileFullData(id: string): Promise<{ content?: string; fileData?: string } | null> {
+    const item = await this.getItemById(id);
+    if (!item) return null;
+
+    if (item.content) return { content: item.content };
+    if (item.fileData) return { fileData: item.fileData };
+
+    // If chunked in Firestore, assemble chunks
+    if (item.chunksCount && item.chunksCount > 0) {
+      try {
+        const chunksSnap = await getDocs(collection(firestoreDb, 'studyItems', id, 'chunks'));
+        const chunks: Array<{ index: number; data: string }> = [];
+        chunksSnap.forEach(d => chunks.push(d.data() as any));
+        chunks.sort((a, b) => a.index - b.index);
+        const fullBase64 = chunks.map(c => c.data).join('');
+        return { fileData: fullBase64 };
+      } catch (err) {
+        console.error('[Storage] Error retrieving chunks:', err);
+      }
+    }
+
+    return null;
+  }
+
   public async updateItem(id: string, updates: Partial<StudyItem>): Promise<StudyItem> {
+    await this.ensureReady();
     const items = this.getItems();
     const index = this.data.studyItems.findIndex(i => i.id === id);
     if (index === -1) {
@@ -295,11 +530,25 @@ class LibraryStorage {
     };
 
     this.data.studyItems[index] = updated;
-    this.saveDatabase();
+    this.saveDiskCache();
+
+    // Persist to Firestore
+    try {
+      await updateDoc(doc(firestoreDb, 'studyItems', id), sanitizeForFirestore(updates));
+      console.log(`[Storage] Updated item ${id} in Firestore`);
+    } catch (err) {
+      try {
+        await setDoc(doc(firestoreDb, 'studyItems', id), sanitizeForFirestore(updated));
+      } catch (e) {
+        console.error('[Storage] Error updating in Firestore:', e);
+      }
+    }
+
     return this.enrichItem(updated, this.data.studyItems);
   }
 
   public async deleteItem(id: string): Promise<{ deletedIds: string[]; count: number }> {
+    await this.ensureReady();
     const items = this.getItems();
     const itemToDelete = items.find(i => i.id === id);
     if (!itemToDelete) {
@@ -319,7 +568,16 @@ class LibraryStorage {
     collectDescendants(id);
 
     this.data.studyItems = this.data.studyItems.filter(i => !idsToDelete.has(i.id));
-    this.saveDatabase();
+    this.saveDiskCache();
+
+    // Permanently delete from Firestore
+    for (const deleteId of idsToDelete) {
+      try {
+        await deleteDoc(doc(firestoreDb, 'studyItems', deleteId));
+      } catch (err) {
+        console.error(`[Storage] Error deleting doc ${deleteId} from Firestore:`, err);
+      }
+    }
 
     return {
       deletedIds: Array.from(idsToDelete),
@@ -328,6 +586,7 @@ class LibraryStorage {
   }
 
   public async getStats(): Promise<LibraryStats> {
+    await this.ensureReady();
     const items = this.getItems();
     const folders = items.filter(i => i.type === 'folder');
     const files = items.filter(i => i.type !== 'folder');
@@ -354,7 +613,9 @@ class LibraryStorage {
     };
   }
 
+  // Studiverse
   public async getStudiverseData(): Promise<{ liveEmbed: string; videos: any[] }> {
+    await this.ensureReady();
     return this.data.studiverse || { liveEmbed: '', videos: [] };
   }
 
@@ -363,7 +624,12 @@ class LibraryStorage {
       ...(this.data.studiverse || { videos: [] }),
       liveEmbed
     };
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'settings', 'studiverse'), sanitizeForFirestore(this.data.studiverse));
+    } catch (e) {
+      console.error('[Storage] Error persisting studiverse to Firestore:', e);
+    }
   }
 
   public async updateStudiverseVideos(videos: any[]): Promise<void> {
@@ -371,19 +637,27 @@ class LibraryStorage {
       ...(this.data.studiverse || { liveEmbed: '' }),
       videos
     };
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'settings', 'studiverse'), sanitizeForFirestore(this.data.studiverse));
+    } catch (e) {
+      console.error('[Storage] Error persisting studiverse to Firestore:', e);
+    }
   }
 
   // Premium Users
   public async getPremiumUsers(): Promise<any[]> {
+    await this.ensureReady();
     return [...(this.data.premiumUsers || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   public async getPremiumUser(id: string): Promise<any | null> {
+    await this.ensureReady();
     return this.data.premiumUsers.find(u => u.internalId === id || u.id === id) || null;
   }
 
   public async getPremiumUserByEmailOrMobile(identifier: string): Promise<any | null> {
+    await this.ensureReady();
     return this.data.premiumUsers.find(u => u.email === identifier || u.mobile === identifier || u.id === identifier) || null;
   }
 
@@ -397,7 +671,12 @@ class LibraryStorage {
       createdAt: new Date().toISOString()
     };
     this.data.premiumUsers.push(user);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'premiumUsers', newId), sanitizeForFirestore(user));
+    } catch (e) {
+      console.error('[Storage] Error persisting premiumUser to Firestore:', e);
+    }
     return user;
   }
 
@@ -405,21 +684,33 @@ class LibraryStorage {
     const index = this.data.premiumUsers.findIndex(u => u.internalId === internalId);
     if (index !== -1) {
       this.data.premiumUsers[index] = { ...this.data.premiumUsers[index], ...updates };
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'premiumUsers', internalId), sanitizeForFirestore(updates));
+      } catch (e) {
+        console.error('[Storage] Error updating premiumUser in Firestore:', e);
+      }
     }
   }
 
   public async deletePremiumUser(internalId: string): Promise<void> {
     this.data.premiumUsers = this.data.premiumUsers.filter(u => u.internalId !== internalId);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await deleteDoc(doc(firestoreDb, 'premiumUsers', internalId));
+    } catch (e) {
+      console.error('[Storage] Error deleting premiumUser in Firestore:', e);
+    }
   }
 
   // Premium Courses
   public async getPremiumCourses(): Promise<PremiumCourse[]> {
+    await this.ensureReady();
     return [...(this.data.premiumCourses || [])];
   }
 
   public async getPremiumCourse(id: string): Promise<PremiumCourse | null> {
+    await this.ensureReady();
     return this.data.premiumCourses.find(c => c.id === id) || null;
   }
 
@@ -432,7 +723,12 @@ class LibraryStorage {
       updatedAt: new Date().toISOString()
     };
     this.data.premiumCourses.push(newCourse);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'premiumCourses', id), sanitizeForFirestore(newCourse));
+    } catch (e) {
+      console.error('[Storage] Error creating premiumCourse in Firestore:', e);
+    }
     return newCourse;
   }
 
@@ -444,18 +740,29 @@ class LibraryStorage {
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'premiumCourses', id), sanitizeForFirestore(updates));
+      } catch (e) {
+        console.error('[Storage] Error updating premiumCourse in Firestore:', e);
+      }
     }
   }
 
   public async deletePremiumCourse(id: string): Promise<void> {
     this.data.premiumCourses = this.data.premiumCourses.filter(c => c.id !== id);
     this.data.premiumItems = this.data.premiumItems.filter(i => i.courseId !== id);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await deleteDoc(doc(firestoreDb, 'premiumCourses', id));
+    } catch (e) {
+      console.error('[Storage] Error deleting premiumCourse in Firestore:', e);
+    }
   }
 
   // Premium Items
   public async getPremiumItems(courseId: string): Promise<PremiumItem[]> {
+    await this.ensureReady();
     return (this.data.premiumItems || []).filter(i => i.courseId === courseId);
   }
 
@@ -468,7 +775,12 @@ class LibraryStorage {
       updatedAt: new Date().toISOString()
     };
     this.data.premiumItems.push(newItem);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'premiumItems', id), sanitizeForFirestore(newItem));
+    } catch (e) {
+      console.error('[Storage] Error saving premiumItem to Firestore:', e);
+    }
     return newItem;
   }
 
@@ -480,22 +792,34 @@ class LibraryStorage {
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'premiumItems', id), sanitizeForFirestore(updates));
+      } catch (e) {
+        console.error('[Storage] Error updating premiumItem in Firestore:', e);
+      }
     }
   }
 
   public async deletePremiumItem(id: string): Promise<void> {
     this.data.premiumItems = this.data.premiumItems.filter(i => i.id !== id);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await deleteDoc(doc(firestoreDb, 'premiumItems', id));
+    } catch (e) {
+      console.error('[Storage] Error deleting premiumItem in Firestore:', e);
+    }
   }
 
   // Premium Requests
   public async getPremiumRequests(courseId?: string): Promise<PremiumAccessRequest[]> {
+    await this.ensureReady();
     const all = this.data.premiumRequests || [];
     return courseId ? all.filter(r => r.courseId === courseId) : [...all];
   }
 
   public async getUserPremiumRequests(userId: string): Promise<PremiumAccessRequest[]> {
+    await this.ensureReady();
     return (this.data.premiumRequests || []).filter(r => r.userId === userId);
   }
 
@@ -508,7 +832,12 @@ class LibraryStorage {
       updatedAt: new Date().toISOString()
     };
     this.data.premiumRequests.push(newRequest);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'premiumRequests', id), sanitizeForFirestore(newRequest));
+    } catch (e) {
+      console.error('[Storage] Error creating premiumRequest in Firestore:', e);
+    }
     return newRequest;
   }
 
@@ -520,12 +849,18 @@ class LibraryStorage {
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      this.saveDatabase();
+      this.saveDiskCache();
+      try {
+        await updateDoc(doc(firestoreDb, 'premiumRequests', id), sanitizeForFirestore(updates));
+      } catch (e) {
+        console.error('[Storage] Error updating premiumRequest in Firestore:', e);
+      }
     }
   }
 
   // Feedback Methods
   public async getFeedback(): Promise<FeedbackSubmission[]> {
+    await this.ensureReady();
     return [...(this.data.feedback || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
@@ -537,10 +872,14 @@ class LibraryStorage {
       createdAt: new Date().toISOString()
     };
     this.data.feedback.push(newFeedback);
-    this.saveDatabase();
+    this.saveDiskCache();
+    try {
+      await setDoc(doc(firestoreDb, 'feedback', id), sanitizeForFirestore(newFeedback));
+    } catch (e) {
+      console.error('[Storage] Error saving feedback to Firestore:', e);
+    }
     return newFeedback;
   }
 }
 
-export const db = null as any;
 export const storage = new LibraryStorage();

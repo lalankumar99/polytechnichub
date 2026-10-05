@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { MonitorPlay, Youtube, Loader2, AlertCircle } from 'lucide-react';
+import { extractYoutubeId } from '../utils/formatters';
 
 export default function Studiverse() {
   const [activeTab, setActiveTab] = useState<'live' | 'vault'>('live');
@@ -28,15 +29,8 @@ export default function Studiverse() {
 
   const getYouTubeEmbedUrl = (url: string) => {
     try {
-      let videoId = '';
-      if (url.includes('youtube.com/watch')) {
-        videoId = new URL(url).searchParams.get('v') || '';
-      } else if (url.includes('youtu.be/')) {
-        videoId = url.split('youtu.be/')[1].split('?')[0];
-      } else if (url.includes('youtube.com/embed/')) {
-        videoId = url.split('youtube.com/embed/')[1].split('?')[0];
-      }
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+      const videoId = extractYoutubeId(url);
+      return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1` : url;
     } catch (e) {
       return url;
     }

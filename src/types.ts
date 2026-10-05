@@ -7,10 +7,18 @@ export interface StudyItem {
   id: string;
   name: string;
   type: ItemType;
+  displayType?: 'pdf' | 'html' | 'video' | 'link'; // Masked type presented to end users
+  maskedExtension?: string; // e.g. '.pdf' for HTML documents masked as PDF
+  isVideo?: boolean; // Option/checkbox to designate uploads as Video
+  thumbnailUrl?: string; // High-res thumbnail (e.g. YouTube oEmbed or video poster)
+  videoTitle?: string; // External video title from oEmbed standard
+  videoAuthor?: string;
   parentId: string | null;
   status: ItemStatus;
   size: number; // in bytes
   fileUrl?: string;
+  fileData?: string; // Base64 data URL or encoded buffer for permanent Firestore storage
+  chunksCount?: number;
   content?: string; // HTML or note text
   description?: string;
   branch?: string;

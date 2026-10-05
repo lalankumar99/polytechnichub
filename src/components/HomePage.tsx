@@ -17,16 +17,20 @@ import {
   CheckCircle2,
   Maximize2,
   FolderOpen,
-  Download
+  Download,
+  Play,
+  Youtube,
+  Link2
 } from 'lucide-react';
 import { StudyItem, LibraryStats } from '../types';
-import { formatFileSize, formatDate } from '../utils/formatters';
+import { formatFileSize, formatDate, getMaskedDisplayName, getEffectiveDisplayType, getYoutubeThumbnailUrl } from '../utils/formatters';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 
 
 interface HomePageProps {
   onOpenPremiumCourse?: () => void;
+  onOpenDriveReader?: () => void;
   onNavigateBrowse: (folderId?: string | null) => void;
   onOpenSearch: () => void;
   onOpenFile: (file: StudyItem) => void;
@@ -40,7 +44,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenFile,
   stats,
   items,
-  onOpenPremiumCourse
+  onOpenPremiumCourse,
+  onOpenDriveReader
 }) => {
   const { isInstallable, promptInstall } = usePWAInstall();
   // Recent published files
@@ -155,7 +160,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-             <button
+            {onOpenDriveReader && (
+              <button
+                onClick={onOpenDriveReader}
+                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 shadow-sm transition-all flex items-center space-x-2 cursor-pointer"
+                title="Open Google Drive Fullscreen PDF Reader"
+              >
+                <FileText className="w-4 h-4 text-cyan-400" />
+                <span>Drive PDF</span>
+              </button>
+            )}
+
+            <button
               onClick={() => onOpenPremiumCourse && onOpenPremiumCourse()}
               className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 shadow-sm transition-all flex items-center space-x-2"
             >
@@ -325,48 +341,87 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {recentFiles.map((file) => {
-            const isPdf = file.type === 'pdf';
+            const effType = getEffectiveDisplayType(file);
+            const displayName = getMaskedDisplayName(file);
+            const isPdf = effType === 'pdf';
+            const isVideo = effType === 'video';
+            const isLink = effType === 'link';
+            const thumbUrl = file.thumbnailUrl || (isVideo ? getYoutubeThumbnailUrl(file.fileUrl) : null);
+
             return (
               <div
                 key={file.id}
                 className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
               >
                 <div>
+                  {isVideo && thumbUrl && (
+                    <div 
+                      onClick={() => onOpenFile(file)}
+                      className="relative aspect-video mb-3 rounded-lg overflow-hidden bg-slate-950 border border-slate-200 group-hover:border-red-400 cursor-pointer transition-all shadow-sm"
+                    >
+                      <img 
+                        src={thumbUrl} 
+                        alt={displayName} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <Play className="w-4 h-4 fill-white translate-x-0.5" />
+                        </div>
+                      </div>
+                      <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-white text-[9px] font-bold rounded">
+                        VIDEO
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start space-x-3">
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                         isPdf
-                          ? 'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                          ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                          : isVideo
+                          ? 'bg-red-50 text-red-600 border border-red-200'
+                          : isLink
+                          ? 'bg-teal-50 text-teal-600 border border-teal-200'
                           : 'bg-indigo-50 text-indigo-600 border border-indigo-200'
                       }`}>
-                        {<FileText className="w-5 h-5" />}
+                        {isPdf ? <FileText className="w-5 h-5 text-rose-600" /> :
+                         isVideo ? <Youtube className="w-5 h-5 text-red-600" /> :
+                         isLink ? <Link2 className="w-5 h-5 text-teal-600" /> :
+                         <Code className="w-5 h-5 text-indigo-600" />}
                       </div>
                       <div>
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
                           isPdf
-                            ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                            ? 'bg-rose-50 text-rose-600 border-rose-200'
+                            : isVideo
+                            ? 'bg-red-50 text-red-600 border-red-200'
+                            : isLink
+                            ? 'bg-teal-50 text-teal-600 border-teal-200'
                             : 'bg-indigo-50 text-indigo-600 border-indigo-200'
                         }`}>
-                          "DOC"
+                          {isPdf ? 'PDF' : isVideo ? 'VIDEO' : isLink ? 'LINK' : 'NOTE'}
                         </span>
                         <h4 className="font-bold text-slate-900 text-sm mt-1 group-hover:text-blue-600 transition-colors line-clamp-1">
-                          {file.name.replace(/\.(pdf|html)$/i, '')}
+                          {displayName}
                         </h4>
                       </div>
                     </div>
                   </div>
 
                   <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
-                    {file.description || `Comprehensive study notes for ${file.subject || file.branch || 'Polytechnic Engineering'}.`}
+                    {file.description || (file.videoTitle ? `Video: ${file.videoTitle}` : `Comprehensive study notes for ${file.subject || file.branch || 'Polytechnic Engineering'}.`)}
                   </p>
 
                   <div className="flex items-center space-x-3 text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-100">
-                    <span>{formatFileSize(file.size)}</span>
+                    <span>{isVideo ? 'Stream' : formatFileSize(file.size)}</span>
                     <span>•</span>
                     <span>{formatDate(file.createdAt)}</span>
                     <span>•</span>
-                    <span className="flex items-center space-x-1">
-                      <Eye className="w-3 h-3" />
+                    <span className="flex items-center space-x-1 font-semibold text-slate-600">
+                      <Eye className="w-3.5 h-3.5 text-blue-500" />
                       <span>{file.viewsCount || 0} reads</span>
                     </span>
                   </div>
@@ -375,10 +430,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="mt-4 pt-2">
                   <button
                     onClick={() => onOpenFile(file)}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-slate-900 hover:bg-blue-600 text-white transition-colors flex items-center justify-center space-x-1.5 shadow-sm"
+                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold text-white transition-colors flex items-center justify-center space-x-1.5 shadow-sm ${
+                      isVideo ? 'bg-red-600 hover:bg-red-700' : isPdf ? 'bg-slate-900 hover:bg-rose-600' : 'bg-slate-900 hover:bg-blue-600'
+                    }`}
                   >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                    <span>Open in Study Viewer</span>
+                    {isVideo ? <Play className="w-3.5 h-3.5 fill-white" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    <span>{isVideo ? 'Watch Video' : isPdf ? 'Read PDF' : 'Open in Study Viewer'}</span>
                   </button>
                 </div>
               </div>

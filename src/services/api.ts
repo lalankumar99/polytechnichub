@@ -250,27 +250,65 @@ export const api = {
     return data.folder;
   },
 
-  async createFileRecord(name: string, type: 'pdf' | 'html' | 'youtube' | 'link', fileUrl: string, size: number, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, branch?: string, semester?: string): Promise<StudyItem> {
+  async createFileRecord(
+    name: string,
+    type: 'pdf' | 'html' | 'youtube' | 'link',
+    fileUrl: string,
+    size: number,
+    parentId: string | null,
+    status: 'published' | 'draft' = 'published',
+    description?: string,
+    branch?: string,
+    semester?: string,
+    displayType?: 'pdf' | 'html' | 'video' | 'link',
+    isVideo?: boolean,
+    thumbnailUrl?: string,
+    videoTitle?: string
+  ): Promise<StudyItem> {
     const res = await fetch(`${API_BASE}/admin/create-file-record`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ name, type, fileUrl, size, parentId, status, description, branch, semester })
+      body: JSON.stringify({
+        name,
+        type,
+        fileUrl,
+        size,
+        parentId,
+        status,
+        description,
+        branch,
+        semester,
+        displayType,
+        isVideo,
+        thumbnailUrl,
+        videoTitle
+      })
     });
     const data = await safeJson(res, 'Failed to create file record');
     if (!data.success) throw new Error(data.error || 'Failed to create file record');
     return data.file;
   },
 
-  async uploadFile(file: File, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, isPremium?: boolean): Promise<StudyItem> {
+  async uploadFile(
+    file: File,
+    parentId: string | null,
+    status: 'published' | 'draft' = 'published',
+    description?: string,
+    isPremium?: boolean,
+    displayType?: 'pdf' | 'html' | 'video' | 'link',
+    isVideo?: boolean
+  ): Promise<StudyItem> {
     const formData = new FormData();
     formData.append('file', file);
     if (parentId) formData.append('parentId', parentId);
     formData.append('status', status);
     if (description) formData.append('description', description);
     if (isPremium !== undefined) formData.append('isPremium', isPremium.toString());
+    if (displayType) formData.append('displayType', displayType);
+    if (isVideo !== undefined) formData.append('isVideo', isVideo.toString());
 
     const res = await fetch(`${API_BASE}/admin/upload`, {
       method: 'POST',
@@ -282,18 +320,44 @@ export const api = {
     return data.file;
   },
 
-  async createHtmlNote(name: string, content: string, parentId: string | null, status: 'published' | 'draft' = 'published', description?: string, branch?: string, semester?: string): Promise<StudyItem> {
+  async createHtmlNote(
+    name: string,
+    content: string,
+    parentId: string | null,
+    status: 'published' | 'draft' = 'published',
+    description?: string,
+    branch?: string,
+    semester?: string,
+    displayType: 'pdf' | 'html' | 'video' | 'link' = 'pdf',
+    isVideo?: boolean
+  ): Promise<StudyItem> {
     const res = await fetch(`${API_BASE}/admin/create-html-note`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ name, content, parentId, status, description, branch, semester })
+      body: JSON.stringify({
+        name,
+        content,
+        parentId,
+        status,
+        description,
+        branch,
+        semester,
+        displayType,
+        isVideo
+      })
     });
     const data = await safeJson(res, 'Failed to create HTML note');
     if (!data.success) throw new Error(data.error || 'Failed to create HTML note');
     return data.file;
+  },
+
+  async fetchYoutubeMetadata(url: string): Promise<{ title: string; thumbnailUrl: string; videoId: string | null; author: string }> {
+    const res = await fetch(`${API_BASE}/utils/youtube-oembed?url=${encodeURIComponent(url)}`);
+    const data = await safeJson(res, 'Failed to fetch YouTube details');
+    return data;
   },
 
   async updateItem(id: string, updates: Partial<StudyItem>): Promise<StudyItem> {

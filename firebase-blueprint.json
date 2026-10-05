@@ -12,6 +12,8 @@
         "status": { "type": "string", "enum": ["published", "draft", "unpublished"] },
         "size": { "type": "number" },
         "fileUrl": { "type": "string" },
+        "fileData": { "type": "string" },
+        "chunksCount": { "type": "number" },
         "content": { "type": "string" },
         "description": { "type": "string" },
         "branch": { "type": "string" },

@@ -6,7 +6,8 @@ import {
   Shield,
   LogOut,
   SlidersHorizontal,
-  GraduationCap
+  GraduationCap,
+  FileText
 } from 'lucide-react';
 import { AdminUser } from '../types';
 
@@ -19,6 +20,7 @@ interface HeaderProps {
   onOpenLogin: () => void;
   onOpenSearch: () => void;
   onLogout: () => void;
+  onOpenDriveReader?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,7 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSearch,
   onLogout,
   premiumUser,
-  onPremiumLogout
+  onPremiumLogout,
+  onOpenDriveReader
 }) => {
   return (
     <header id="polytechnic-header" className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 text-slate-900 shadow-sm">
@@ -93,6 +96,17 @@ export const Header: React.FC<HeaderProps> = ({
               <BookOpen className="w-4 h-4" />
               <span>About</span>
             </button>
+
+            {onOpenDriveReader && (
+              <button
+                onClick={onOpenDriveReader}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200/80 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+                title="Open Google Drive PDF Viewer"
+              >
+                <FileText className="w-3.5 h-3.5 text-cyan-600" />
+                <span>Drive PDF</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Action / Admin Authentication */}

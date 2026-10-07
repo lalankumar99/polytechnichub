@@ -1,6 +1,6 @@
 {
-  "name": "POLYTECHNIC HUB",
-  "short_name": "PolyHub",
+  "name": "Polytechnic Hub",
+  "short_name": "Polytechnic Hub",
   "description": "Digital Study Library and Notes for Polytechnic Engineering Students",
   "start_url": "/",
   "display": "standalone",
@@ -11,20 +11,34 @@
   "id": "/",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/pwa-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/pwa-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "prefer_related_applications": false

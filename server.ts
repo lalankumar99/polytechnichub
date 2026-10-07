@@ -1,12 +1,13 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
-import { storage, UPLOADS_PATH } from './server/storage';
+import { storage, UPLOADS_PATH } from './server/storage.ts';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Body parsing
 app.use(express.json({ limit: '50mb' }));
@@ -308,7 +309,7 @@ app.post('/api/admin/folders', adminAuthMiddleware, async (req, res) => {
 // 3. Create File Record (bypassing local disk multer)
 app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) => {
   try {
-    const { name, type, parentId, status, size, fileUrl, description, branch, semester, isPremium, displayType, isVideo, thumbnailUrl, videoTitle } = req.body;
+    const { name, type, parentId, status, size, fileUrl, description, branch, semester, isPremium, accessType, displayType, isVideo, thumbnailUrl, videoTitle } = req.body;
     
     if (!name || !type || !fileUrl) {
       return res.status(400).json({ success: false, error: 'Name, type, and fileUrl are required' });
@@ -325,6 +326,7 @@ app.post('/api/admin/create-file-record', adminAuthMiddleware, async (req, res) 
       branch,
       semester,
       isPremium,
+      accessType: accessType || (isPremium ? 'premium' : 'both'),
       displayType,
       isVideo: isVideo === true || isVideo === 'true' || type === 'youtube',
       thumbnailUrl,
@@ -575,16 +577,24 @@ app.delete('/api/admin/premium-courses/:id', adminAuthMiddleware, async (req, re
 // Premium Users Endpoints
 app.post('/api/premium-users/register', async (req, res) => {
   try {
-    const { name, email, mobile, password } = req.body;
+    const { name, email, mobile, password, photoUrl } = req.body;
     if (!name || !email || !mobile || !password) {
-      return res.status(400).json({ success: false, error: 'All fields are required' });
+      return res.status(400).json({ success: false, error: 'All fields (Name, Email, Mobile, Password) are required' });
     }
-    const existing = await storage.getPremiumUserByEmailOrMobile(email);
-    const existing2 = await storage.getPremiumUserByEmailOrMobile(mobile);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanMobile = mobile.trim();
+    const existing = await storage.getPremiumUserByEmailOrMobile(cleanEmail);
+    const existing2 = await storage.getPremiumUserByEmailOrMobile(cleanMobile);
     if (existing || existing2) {
       return res.status(400).json({ success: false, error: 'Email or Mobile already registered' });
     }
-    const user = await storage.createPremiumUser({ name, email, mobile, password });
+    const user = await storage.createPremiumUser({
+      name: name.trim(),
+      email: cleanEmail,
+      mobile: cleanMobile,
+      password,
+      photoUrl: photoUrl || ''
+    });
     res.json({ success: true, user });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -595,23 +605,95 @@ app.post('/api/premium-users/login', async (req, res) => {
   try {
     const { identifier, password } = req.body;
     if (!identifier || !password) {
-      return res.status(400).json({ success: false, error: 'ID and Password are required' });
+      return res.status(400).json({ success: false, error: 'Login ID / Email / Mobile and Password are required' });
     }
     const user = await storage.getPremiumUserByEmailOrMobile(identifier);
     if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid ID or Password' });
+      return res.status(401).json({ success: false, error: 'No account found with this ID / Mobile / Email. Please check or register.' });
     }
     if (user.password !== password) {
-      return res.status(401).json({ success: false, error: 'Invalid ID or Password' });
+      return res.status(401).json({ success: false, error: 'Incorrect password. Please try again.' });
     }
     if (user.status === 'pending') {
-      return res.status(403).json({ success: false, error: 'Account pending approval from admin' });
+      return res.status(403).json({
+        success: false,
+        error: 'Approval Pending: Your registration request has been submitted to the admin. You will be able to log in once the admin approves your account.'
+      });
     }
     if (user.status === 'rejected') {
-      return res.status(403).json({ success: false, error: 'Account access has been revoked' });
+      return res.status(403).json({
+        success: false,
+        error: 'Account access has been declined or revoked by the admin. Please contact the administrator.'
+      });
     }
-    // We omit real JWT for simplicity, returning user object is enough for frontend persistence here
-    res.json({ success: true, user: { id: user.id, internalId: user.internalId, name: user.name, email: user.email, mobile: user.mobile, status: user.status } });
+    res.json({
+      success: true,
+      user: {
+        id: user.id || user.internalId,
+        internalId: user.internalId,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        photoUrl: user.photoUrl || '',
+        status: user.status,
+        assignedCourseIds: user.assignedCourseIds || []
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Sync user session/status
+app.get('/api/premium-users/sync/:internalId', async (req, res) => {
+  try {
+    const user = await storage.getPremiumUser(req.params.internalId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.json({
+      success: true,
+      user: {
+        id: user.id || user.internalId,
+        internalId: user.internalId,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        photoUrl: user.photoUrl || '',
+        status: user.status,
+        assignedCourseIds: user.assignedCourseIds || []
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Update student profile (e.g. photo or name)
+app.post('/api/premium-users/update-profile', async (req, res) => {
+  try {
+    const { internalId, photoUrl, name } = req.body;
+    if (!internalId) {
+      return res.status(400).json({ success: false, error: 'Student ID is required' });
+    }
+    const updates: any = {};
+    if (photoUrl !== undefined) updates.photoUrl = photoUrl;
+    if (name) updates.name = name.trim();
+    await storage.updatePremiumUser(internalId, updates);
+    const updated = await storage.getPremiumUser(internalId);
+    res.json({
+      success: true,
+      user: {
+        id: updated.id || updated.internalId,
+        internalId: updated.internalId,
+        name: updated.name,
+        email: updated.email,
+        mobile: updated.mobile,
+        photoUrl: updated.photoUrl || '',
+        status: updated.status,
+        assignedCourseIds: updated.assignedCourseIds || []
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -628,8 +710,12 @@ app.get('/api/admin/premium-users', adminAuthMiddleware, async (req, res) => {
 
 app.put('/api/admin/premium-users/:internalId', adminAuthMiddleware, async (req, res) => {
   try {
-    const { status, id } = req.body;
-    await storage.updatePremiumUser(req.params.internalId, { status, id });
+    const { status, id, assignedCourseIds } = req.body;
+    const updates: any = {};
+    if (status !== undefined) updates.status = status;
+    if (id !== undefined) updates.id = id;
+    if (assignedCourseIds !== undefined) updates.assignedCourseIds = assignedCourseIds;
+    await storage.updatePremiumUser(req.params.internalId, updates);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -803,18 +889,20 @@ app.all('/api/*', (req, res) => {
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const hasDist = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'));
+
+  if (process.env.NODE_ENV === 'production' || hasDist) {
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
@@ -822,4 +910,9 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
+
+export default app;
+export { app };

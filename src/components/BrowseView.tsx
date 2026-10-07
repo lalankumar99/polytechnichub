@@ -372,7 +372,7 @@ export const BrowseView: React.FC<BrowseViewProps> = ({
                 const isPdf = effType === 'pdf';
                 const isVideo = effType === 'video';
                 const isLink = effType === 'link';
-                const thumbUrl = file.thumbnailUrl || (isVideo ? getYoutubeThumbnailUrl(file.fileUrl) : null);
+                const thumbUrl = file.thumbnailUrl || (isVideo ? (getYoutubeThumbnailUrl(file.fileUrl) || getYoutubeThumbnailUrl(file.content)) : null);
 
                 return (
                   <div

@@ -109,9 +109,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenLogin }) => {
 
         <div className="pt-8 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
           <p>© {new Date().getFullYear()} POLYTECHNIC HUB. All Rights Reserved. Built for Polytechnic Diploma Students.</p>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 flex-wrap gap-y-2">
             <span className="text-[11px] bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-md text-slate-400">English Only Interface</span>
             <span className="text-[11px] bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 px-2.5 py-1 rounded-md">Landscape Ready Reader</span>
+            <span className="text-[11px] bg-emerald-950/50 border border-emerald-800/40 text-emerald-400 px-2.5 py-1 rounded-md flex items-center space-x-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Offline Detection Active</span>
+            </span>
           </div>
         </div>
       </div>

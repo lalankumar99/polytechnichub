@@ -116,10 +116,13 @@ export interface FeedbackSubmission {
 
 export interface PremiumUser {
   id: string; // The ID assigned by Admin
+  internalId?: string;
   name: string;
   email: string;
   mobile: string;
-  password?: string; // Stored plain or simple hash for this context, since requirements say admin sees it or it's just login
+  photoUrl?: string; // Student's original profile photo
+  password?: string;
   status: 'pending' | 'approved' | 'rejected';
+  assignedCourseIds?: string[]; // IDs of specific premium courses granted by Admin
   createdAt: string;
 }

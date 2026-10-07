@@ -20,10 +20,11 @@ import { ExternalLink,
   BookOpen,
   Eye,
   Youtube,
-  Play
+  Play,
+  WifiOff
 } from 'lucide-react';
 import { StudyItem } from '../types';
-import { requestFullscreenAndLandscape, exitFullscreen, formatFileSize, getMaskedDisplayName, getEffectiveDisplayType, extractYoutubeId } from '../utils/formatters';
+import { requestFullscreenAndLandscape, exitFullscreen, formatFileSize, getMaskedDisplayName, getEffectiveDisplayType, extractYoutubeId, parseVideoEmbed } from '../utils/formatters';
 import { DrivePdfViewer } from './DrivePdfViewer';
 import { extractDriveFileId } from '../utils/googleDrive';
 
@@ -41,27 +42,34 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   initialFullscreen = false
 }) => {
   const effType = getEffectiveDisplayType(file);
-  const driveFileId = extractDriveFileId(file.fileUrl || '') || extractDriveFileId(file.id || '');
-  const isGoogleDrivePdf = !!driveFileId || (file.fileUrl && (file.fileUrl.includes('drive.google.com') || file.fileUrl.includes('docs.google.com')));
+  const contentYtId = extractYoutubeId(file.content);
+  const urlYtId = extractYoutubeId(file.fileUrl);
+  const hasYtId = urlYtId || contentYtId;
 
-  // Render DrivePdfViewer directly for Google Drive PDFs
-  if (isGoogleDrivePdf) {
-    return (
-      <DrivePdfViewer
-        driveSource={file.fileUrl || file.id}
-        title={file.name}
-        subtitle={[file.branch, file.semester, file.subject].filter(Boolean).join(' • ')}
-        onClose={onClose}
-        autoFullscreen={initialFullscreen}
-      />
-    );
-  }
-
+  // 1. VIDEO DETECTION: Must run FIRST before PDF check
   const isVideo = effType === 'video' ||
     file.type === 'youtube' ||
     file.isVideo ||
-    (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be'))) ||
-    !!extractYoutubeId(file.fileUrl);
+    !!hasYtId ||
+    (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be') || file.fileUrl.includes('<iframe'))) ||
+    (file.content && (file.content.includes('youtube.com') || file.content.includes('youtu.be') || file.content.includes('class="video"')));
+
+  // 2. PDF DETECTION: Only check file.fileUrl (NEVER file.id) and only if NOT video
+  const driveFileId = !isVideo ? extractDriveFileId(file.fileUrl || '') : null;
+  const isGoogleDrivePdf = !isVideo && (!!driveFileId || (file.fileUrl && (file.fileUrl.includes('drive.google.com') || file.fileUrl.includes('docs.google.com'))));
+  const isAnyPdf = !isVideo && (isGoogleDrivePdf || effType === 'pdf' || file.type === 'pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf')));
+
+  // Render unified mobile-first DrivePdfViewer for all PDF documents
+  if (isAnyPdf) {
+    return (
+      <DrivePdfViewer
+        driveSource={file.fileUrl || `/api/files/${file.id}`}
+        title={file.name}
+        subtitle={[file.branch, file.semester, file.subject].filter(Boolean).join(' • ')}
+        onClose={onClose}
+      />
+    );
+  }
 
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
@@ -181,53 +189,37 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
 
   // IF VIDEO: RENDER ONLY FULLSCREEN LANDSCAPE VIDEO WITH TOP BACK ARROW & BOTTOM FULLSCREEN
   if (isVideo) {
-    const ytId = extractYoutubeId(file.fileUrl);
     let srcUrl = '';
-    if (ytId) {
-      srcUrl = `https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
-    } else if (file.fileUrl) {
-      if (file.fileUrl.includes('watch?v=')) {
-        const id = file.fileUrl.split('watch?v=')[1]?.split('&')[0];
-        srcUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
-      } else if (file.fileUrl.includes('youtu.be/')) {
-        const id = file.fileUrl.split('youtu.be/')[1]?.split('?')[0];
-        srcUrl = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
-      } else {
-        srcUrl = file.fileUrl;
-      }
+    if (hasYtId) {
+      srcUrl = `https://www.youtube-nocookie.com/embed/${hasYtId}?autoplay=1&rel=0&playsinline=1&controls=1&fs=1`;
+    } else {
+      // Check fileUrl and content
+      const urlEmbed = file.fileUrl && !file.fileUrl.startsWith('/api/') && !file.fileUrl.startsWith('/uploads/') 
+        ? parseVideoEmbed(file.fileUrl).embedUrl 
+        : '';
+      const contentEmbed = parseVideoEmbed(file.content).embedUrl;
+      srcUrl = urlEmbed || contentEmbed || file.fileUrl || '';
+    }
+
+    // Sanitize in case srcUrl still contains an iframe string
+    if (srcUrl && srcUrl.includes('<iframe')) {
+      const match = srcUrl.match(/src=["']([^"']+)["']/i);
+      if (match && match[1]) srcUrl = match[1];
     }
 
     return (
       <>
         <style>{`
-          /* FORCED 100% UNBREAKABLE LANDSCAPE LOCK & EDGE-TO-EDGE FULLSCREEN */
-          @media screen and (orientation: portrait) {
-            .force-landscape-player {
-              position: fixed !important;
-              top: 50% !important;
-              left: 50% !important;
-              width: 100vh !important;
-              height: 100vw !important;
-              transform: translate(-50%, -50%) rotate(90deg) !important;
-              transform-origin: center center !important;
-              overflow: hidden !important;
-              z-index: 9999999 !important;
-              background: #000 !important;
-            }
-          }
-          @media screen and (orientation: landscape) {
-            .force-landscape-player {
-              position: fixed !important;
-              inset: 0 !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 100vw !important;
-              height: 100vh !important;
-              transform: none !important;
-              overflow: hidden !important;
-              z-index: 9999999 !important;
-              background: #000 !important;
-            }
+          .force-landscape-player {
+            position: fixed !important;
+            inset: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            z-index: 9999999 !important;
+            background: #000 !important;
           }
           .force-landscape-player iframe {
             position: absolute !important;
@@ -253,26 +245,43 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
             allowFullScreen
           />
 
-          {/* TOP LEFT BACK ARROW */}
+          {/* Offline Warning Overlay for Video */}
+          {!navigator.onLine && (
+            <div className="absolute inset-0 z-[10000001] bg-black/90 flex flex-col items-center justify-center p-6 text-center text-white space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto mb-1">
+                <WifiOff className="w-7 h-7" />
+              </div>
+              <h3 className="text-base font-black text-white">Internet Connection Required</h3>
+              <p className="text-xs text-slate-300 max-w-sm">
+                Video lecture streaming requires an active internet connection. Please connect to Wi-Fi or mobile data to watch this lecture.
+              </p>
+              <button
+                onClick={handleVideoBack}
+                className="px-4 py-2 rounded-xl bg-white text-black font-extrabold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Return to Materials
+              </button>
+            </div>
+          )}
+
+          {/* TOP LEFT BACK ARROW (ICON ONLY) */}
           <button
             onClick={handleVideoBack}
-            className="absolute top-3 left-3 z-[10000000] px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-white/20 flex items-center space-x-1.5 text-xs font-bold"
-            aria-label="Back to Library"
+            className="absolute top-3 left-3 z-[10000000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all active:scale-95 cursor-pointer border border-white/20"
+            aria-label="Back"
             title="Back"
           >
             <ArrowLeft className="w-4 h-4 text-white" />
-            <span>Back</span>
           </button>
 
-          {/* BOTTOM RIGHT FULLSCREEN TOGGLE */}
+          {/* BOTTOM RIGHT FULLSCREEN TOGGLE (BRACKET ICON ONLY - NO TEXT) */}
           <button
             onClick={handleFullscreenToggle}
-            className="absolute bottom-3 right-3 z-[10000000] px-3 py-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-white/20 text-xs font-bold flex items-center space-x-1.5"
+            className="absolute bottom-3 right-3 z-[10000000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all active:scale-95 cursor-pointer border border-white/20"
             aria-label="Toggle Fullscreen"
-            title="Original Fullscreen"
+            title="Fullscreen"
           >
-            <Maximize className="w-4 h-4 text-cyan-400" />
-            <span>Fullscreen</span>
+            <Maximize className="w-5 h-5 text-white" />
           </button>
         </div>
       </>
@@ -300,13 +309,21 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   }>({ initialDist: 0, initialZoom: 100, isPinching: false });
 
   const displayName = getMaskedDisplayName(file);
-  const isPdf = effType === 'pdf';
+  const isPdf = (effType as string) === 'pdf';
   const isYoutube = false;
   const isLink = effType === 'link';
   const fileApiUrl = file.fileUrl || `/api/files/${file.id}`;
 
-  // Enter fullscreen on mount if requested
+  // Enter fullscreen on mount if requested & listen to mobile back button
   useEffect(() => {
+    window.history.pushState({ studyViewerOpen: true }, '');
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
     if (initialFullscreen && containerRef.current) {
       requestFullscreenAndLandscape(containerRef.current).then(({ fullscreenGranted, orientationGranted }) => {
         setIsFullscreen(fullscreenGranted || initialFullscreen);
@@ -332,10 +349,11 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      window.removeEventListener('popstate', handlePopState);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [initialFullscreen, isFullscreen]);
+  }, [initialFullscreen, isFullscreen, onClose]);
 
   const toggleFullscreen = async () => {
     if (!isFullscreen && containerRef.current) {
@@ -921,7 +939,14 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
               transformOrigin: 'top center'
             }}
           >
-            {file.content ? (
+            {file.content && (file.content.includes('<!DOCTYPE') || file.content.includes('<html')) ? (
+              <iframe
+                srcDoc={file.content}
+                title={file.name.replace(/\.(pdf|html)$/i, '')}
+                className="w-full h-full border-0 bg-white rounded-xl min-h-[70vh]"
+                sandbox="allow-scripts allow-same-origin allow-popups"
+              />
+            ) : file.content ? (
               <div
                 className="study-html-content space-y-4"
                 dangerouslySetInnerHTML={{ __html: file.content }}

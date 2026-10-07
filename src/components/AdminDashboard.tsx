@@ -40,11 +40,15 @@ import { formatFileSize, formatDate, extractYoutubeId, getYoutubeThumbnailUrl } 
 interface AdminDashboardProps {
   onOpenFile: (file: StudyItem) => void;
   onRefreshPublicData: () => void;
+  triggerAddDrivePdf?: boolean;
+  onResetTriggerAddDrivePdf?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenFile,
-  onRefreshPublicData
+  onRefreshPublicData,
+  triggerAddDrivePdf,
+  onResetTriggerAddDrivePdf
 }) => {
   const [items, setItems] = useState<StudyItem[]>([]);
   const [stats, setStats] = useState<LibraryStats | null>(null);
@@ -101,6 +105,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCreateHtmlModal, setShowCreateHtmlModal] = useState(false);
+  
+  // Dedicated Drive PDF with Location Selection
+  const [showDrivePdfModal, setShowDrivePdfModal] = useState(false);
+  const [drivePdfName, setDrivePdfName] = useState('');
+  const [drivePdfUrl, setDrivePdfUrl] = useState('');
+  const [drivePdfDesc, setDrivePdfDesc] = useState('');
+  const [drivePdfBranch, setDrivePdfBranch] = useState('Computer Science');
+  const [drivePdfSemester, setDrivePdfSemester] = useState('Semester 1');
+  const [drivePdfLocationFolderId, setDrivePdfLocationFolderId] = useState<string>('root');
+  const [drivePdfAccessType, setDrivePdfAccessType] = useState<"free" | "premium" | "both">('both');
+  const [drivePdfStatus, setDrivePdfStatus] = useState<'published' | 'draft'>('published');
+  const [drivePdfCreateNewFolder, setDrivePdfCreateNewFolder] = useState<boolean>(false);
+  const [drivePdfNewFolderName, setDrivePdfNewFolderName] = useState<string>('');
+
+  useEffect(() => {
+    if (triggerAddDrivePdf) {
+      setActiveTab('manager');
+      setDrivePdfLocationFolderId(currentFolderId || 'root');
+      const foundFolder = items.find(i => i.id === currentFolderId);
+      if (foundFolder?.branch) setDrivePdfBranch(foundFolder.branch);
+      if (foundFolder?.semester) setDrivePdfSemester(foundFolder.semester);
+      setShowDrivePdfModal(true);
+      if (onResetTriggerAddDrivePdf) {
+        onResetTriggerAddDrivePdf();
+      }
+    }
+  }, [triggerAddDrivePdf, onResetTriggerAddDrivePdf, currentFolderId, items]);
   
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkName, setLinkName] = useState('');
@@ -325,6 +356,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await loadAdminData();
     } catch (err: any) {
       setError(err.message || 'Failed to add link');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddDrivePdf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!drivePdfName.trim() || !drivePdfUrl.trim()) return;
+
+    setLoading(true);
+    try {
+      const trimmedUrl = drivePdfUrl.trim();
+      let targetFolderId = drivePdfLocationFolderId === 'root'
+        ? null
+        : (drivePdfLocationFolderId || currentFolderId || null);
+
+      if (drivePdfCreateNewFolder && drivePdfNewFolderName.trim()) {
+        const createdFolder = await api.createFolder(
+          drivePdfNewFolderName.trim(),
+          targetFolderId,
+          'published',
+          `Created for ${drivePdfBranch} - ${drivePdfSemester}`,
+          drivePdfBranch,
+          drivePdfSemester,
+          drivePdfAccessType === 'premium',
+          drivePdfAccessType
+        );
+        targetFolderId = createdFolder.id;
+      }
+
+      await api.createFileRecord(
+        drivePdfName.trim(),
+        'pdf',
+        trimmedUrl,
+        0,
+        targetFolderId,
+        drivePdfStatus,
+        drivePdfDesc.trim(),
+        drivePdfBranch,
+        drivePdfSemester,
+        'pdf',
+        false,
+        undefined,
+        undefined,
+        drivePdfAccessType === 'premium',
+        drivePdfAccessType
+      );
+
+      setShowDrivePdfModal(false);
+      setDrivePdfName('');
+      setDrivePdfUrl('');
+      setDrivePdfDesc('');
+      setDrivePdfCreateNewFolder(false);
+      setDrivePdfNewFolderName('');
+      triggerSuccess(`Google Drive PDF "${drivePdfName}" saved to selected location successfully.`);
+      await loadAdminData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add Google Drive PDF');
     } finally {
       setLoading(false);
     }
@@ -729,6 +818,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Creation & Upload Action Buttons */}
           <div className="flex items-center flex-wrap gap-2">
+            <button
+              id="admin-add-drive-pdf-btn"
+              onClick={() => {
+                setDrivePdfLocationFolderId(currentFolderId || 'root');
+                setDrivePdfBranch(currentFolder?.branch || 'Computer Science');
+                setDrivePdfSemester(currentFolder?.semester || 'Semester 1');
+                setShowDrivePdfModal(true);
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer"
+              title="Add Google Drive PDF with branch/semester/folder location"
+            >
+              <FileText className="w-4 h-4 text-cyan-200" />
+              <span>+ Add Drive PDF</span>
+            </button>
+
             <button
               id="admin-new-folder-btn"
               onClick={() => setShowNewFolderModal(true)}
@@ -1275,6 +1379,291 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {/* MODAL: ADD GOOGLE DRIVE PDF WITH LOCATION SELECTION */}
+      {showDrivePdfModal && (() => {
+        const detectedFileId = extractDriveFileId(drivePdfUrl);
+        const selectedFolderObj = items.find(i => i.id === drivePdfLocationFolderId);
+        const matchingFolders = items.filter(
+          i => i.type === 'folder' && (i.branch === drivePdfBranch || i.semester === drivePdfSemester)
+        );
+        const otherFolders = items.filter(
+          i => i.type === 'folder' && !matchingFolders.some(m => m.id === i.id)
+        );
+        const targetPathDisplay = `${drivePdfBranch} > ${drivePdfSemester} > ${
+          drivePdfCreateNewFolder
+            ? (drivePdfNewFolderName.trim() || '[New Folder]')
+            : (drivePdfLocationFolderId === 'root'
+                ? '📂 Library Root'
+                : (selectedFolderObj?.name || 'Selected Folder'))
+        }`;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in font-sans">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 border border-slate-200 max-h-[92vh] overflow-y-auto">
+              
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-100 text-cyan-700 flex items-center justify-center shadow-xs">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900 leading-tight">Add Google Drive PDF</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-cyan-100 text-cyan-800 rounded-md border border-cyan-300">
+                        Admin Only
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">Only Admin can attach Drive PDFs and select library location</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDrivePdfModal(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddDrivePdf} className="space-y-4">
+                
+                {/* Drive Link / ID */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Google Drive Link or File ID *</span>
+                    <span className="text-[10px] text-cyan-600 font-mono">Public / Shared</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={drivePdfUrl}
+                    onChange={e => setDrivePdfUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+                  />
+                  {drivePdfUrl.trim() && (
+                    <div className="flex items-center space-x-1.5 text-[11px] pt-0.5">
+                      {detectedFileId ? (
+                        <span className="text-emerald-600 font-semibold flex items-center space-x-1">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>Detected Drive ID: <code className="font-mono bg-emerald-50 px-1 py-0.5 rounded text-emerald-800">{detectedFileId}</code></span>
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-medium flex items-center space-x-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Enter standard Google Drive share link, preview link or File ID</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    Accepts Drive share links, preview URLs, or raw File IDs. Embedded cleanly with no Google UI.
+                  </p>
+                </div>
+
+                {/* Document Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Document Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={drivePdfName}
+                    onChange={e => setDrivePdfName(e.target.value)}
+                    placeholder="e.g. Electrical Machines-II Lecture Handout"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+
+                {/* LOCATION SELECTOR */}
+                <div className="p-4 rounded-2xl bg-cyan-50/70 border border-cyan-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-cyan-950 uppercase tracking-wider block">
+                      Select Location in Library
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-cyan-200/70 text-cyan-900 rounded-full">
+                      Branch & Sem Destination
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Branch *</label>
+                      <select
+                        value={drivePdfBranch}
+                        onChange={e => setDrivePdfBranch(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                      >
+                        <option value="Computer Science">Computer Science (CSE)</option>
+                        <option value="Electrical Engineering">Electrical Engineering (EE)</option>
+                        <option value="Mechanical Engineering">Mechanical Engineering (ME)</option>
+                        <option value="Civil Engineering">Civil Engineering (CE)</option>
+                        <option value="Electronics & Comm.">Electronics & Comm. (ECE)</option>
+                        <option value="Information Technology">Information Technology (IT)</option>
+                        <option value="Automobile Engineering">Automobile Engineering</option>
+                        <option value="Common / 1st Year">Common / 1st Year</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Semester *</label>
+                      <select
+                        value={drivePdfSemester}
+                        onChange={e => setDrivePdfSemester(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                      >
+                        <option value="Semester 1">Semester 1</option>
+                        <option value="Semester 2">Semester 2</option>
+                        <option value="Semester 3">Semester 3</option>
+                        <option value="Semester 4">Semester 4</option>
+                        <option value="Semester 5">Semester 5</option>
+                        <option value="Semester 6">Semester 6</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Target Folder Selection */}
+                  {!drivePdfCreateNewFolder ? (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Target Folder / Subject</label>
+                      <select
+                        value={drivePdfLocationFolderId}
+                        onChange={e => setDrivePdfLocationFolderId(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                      >
+                        {currentFolder && (
+                          <option value={currentFolder.id}>
+                            📁 Current Open Folder: {currentFolder.name} ({currentFolder.branch || 'General'})
+                          </option>
+                        )}
+                        <option value="root">📂 Library Root (No subfolder)</option>
+                        {matchingFolders.length > 0 && (
+                          <optgroup label={`📁 Matching Folders for ${drivePdfBranch} / ${drivePdfSemester}`}>
+                            {matchingFolders.map(folder => (
+                              <option key={folder.id} value={folder.id}>
+                                📁 {folder.name} {folder.branch ? `— ${folder.branch}` : ''} {folder.semester ? `(${folder.semester})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {otherFolders.length > 0 && (
+                          <optgroup label="📁 Other Library Folders">
+                            {otherFolders.map(folder => (
+                              <option key={folder.id} value={folder.id}>
+                                📁 {folder.name} {folder.branch ? `— ${folder.branch}` : ''} {folder.semester ? `(${folder.semester})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 p-3 rounded-xl bg-white border border-cyan-300">
+                      <label className="text-[11px] font-bold text-cyan-900 block">
+                        New Folder Name to Create *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={drivePdfNewFolderName}
+                        onChange={e => setDrivePdfNewFolderName(e.target.value)}
+                        placeholder="e.g. Operating Systems Notes"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">
+                        This folder will be automatically created under {drivePdfBranch} &bull; {drivePdfSemester}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Inline New Folder Toggle */}
+                  <div className="flex items-center space-x-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="toggle-create-folder"
+                      checked={drivePdfCreateNewFolder}
+                      onChange={e => setDrivePdfCreateNewFolder(e.target.checked)}
+                      className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                    />
+                    <label htmlFor="toggle-create-folder" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
+                      + Create a new folder/subject for this PDF
+                    </label>
+                  </div>
+
+                  {/* Location Destination Preview */}
+                  <div className="p-2.5 rounded-xl bg-white/80 border border-cyan-200 text-xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                      Destination Path Preview
+                    </span>
+                    <span className="font-semibold text-cyan-900 flex items-center space-x-1 truncate">
+                      <span>📍</span>
+                      <span className="truncate">{targetPathDisplay}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                  <textarea
+                    value={drivePdfDesc}
+                    onChange={e => setDrivePdfDesc(e.target.value)}
+                    placeholder="Summary or syllabus outline..."
+                    rows={2}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none"
+                  />
+                </div>
+
+                {/* Access Type & Status */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Access Level</label>
+                    <select
+                      value={drivePdfAccessType}
+                      onChange={e => setDrivePdfAccessType(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                    >
+                      <option value="both">Both (Free & Premium)</option>
+                      <option value="free">Free Only</option>
+                      <option value="premium">Premium Only (Locked)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Visibility Status</label>
+                    <select
+                      value={drivePdfStatus}
+                      onChange={e => setDrivePdfStatus(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-cyan-500 outline-none"
+                    >
+                      <option value="published">Published (Visible)</option>
+                      <option value="draft">Draft (Hidden)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Modal Actions */}
+                <div className="pt-3 flex items-center justify-end space-x-2.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowDrivePdfModal(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || !drivePdfName.trim() || !drivePdfUrl.trim() || (drivePdfCreateNewFolder && !drivePdfNewFolderName.trim())}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? 'Saving PDF...' : 'Add Drive PDF to Location'}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
       {showYoutubeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-200">
@@ -1292,33 +1681,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             
             <form onSubmit={handleCreateYoutube} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">YouTube Video URL</label>
-                <div className="flex space-x-2">
-                  <input 
-                    type="url" 
+                <label className="text-xs font-bold text-slate-700">
+                  Video Iframe HTML Code or YouTube Link *
+                </label>
+                <div className="flex flex-col space-y-2">
+                  <textarea 
+                    rows={3}
                     value={youtubeUrl} 
                     onChange={e => {
-                      setYoutubeUrl(e.target.value);
-                      if (e.target.value.includes('youtu')) {
-                        handleFetchYoutubeInfo(e.target.value);
+                      const val = e.target.value;
+                      setYoutubeUrl(val);
+                      const id = extractYoutubeId(val);
+                      if (id) {
+                        handleFetchYoutubeInfo(`https://www.youtube.com/watch?v=${id}`);
                       }
                     }}
-                    onBlur={() => handleFetchYoutubeInfo()}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none"
-                    placeholder="https://www.youtube.com/watch?v=..."
+                    onBlur={() => {
+                      const id = extractYoutubeId(youtubeUrl);
+                      if (id) handleFetchYoutubeInfo(`https://www.youtube.com/watch?v=${id}`);
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-red-600 focus:border-transparent outline-none resize-y"
+                    placeholder={`<iframe width="560" height="315" src="https://www.youtube.com/embed/..." title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`}
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleFetchYoutubeInfo()}
-                    disabled={fetchingYoutube || !youtubeUrl.trim()}
-                    className="px-3 py-2 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 shrink-0 border border-red-200 disabled:opacity-50"
-                    title="Auto-fetch video title & thumbnail from YouTube oEmbed"
-                  >
-                    {fetchingYoutube ? 'Fetching...' : 'Auto-Fetch'}
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-slate-500">
+                      Both Iframe HTML embed code and direct YouTube video links are supported.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = extractYoutubeId(youtubeUrl);
+                        if (id) handleFetchYoutubeInfo(`https://www.youtube.com/watch?v=${id}`);
+                      }}
+                      disabled={fetchingYoutube || !youtubeUrl.trim()}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 shrink-0 border border-red-200 disabled:opacity-50 cursor-pointer"
+                      title="Auto-fetch video title & thumbnail from YouTube oEmbed"
+                    >
+                      {fetchingYoutube ? 'Fetching...' : 'Auto-Fetch Details'}
+                    </button>
+                  </div>
                 </div>
-                <p className="text-[11px] text-slate-400">Title & high-res thumbnail will be fetched via YouTube oEmbed standard.</p>
               </div>
 
               {/* YouTube Thumbnail Preview */}

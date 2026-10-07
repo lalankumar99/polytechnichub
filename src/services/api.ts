@@ -70,9 +70,21 @@ export const api = {
 
   // Premium Courses
   async getPremiumCourses(): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/premium/courses`);
-    const data = await safeJson(res, 'Failed to fetch courses');
-    return data.courses || [];
+    try {
+      const res = await fetch(`${API_BASE}/premium/courses`);
+      const data = await safeJson(res, 'Failed to fetch courses');
+      const courses = data.courses || [];
+      try {
+        localStorage.setItem('polytechnic_cache_premium_courses', JSON.stringify(courses));
+      } catch (e) {}
+      return courses;
+    } catch (err) {
+      try {
+        const cached = localStorage.getItem('polytechnic_cache_premium_courses');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+      throw err;
+    }
   },
 
   async getPremiumCourse(id: string): Promise<any> {
@@ -106,9 +118,21 @@ export const api = {
 
   // Premium Items
   async getPremiumItems(courseId: string): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/premium/items/${courseId}`);
-    const data = await safeJson(res, 'Failed to fetch premium items');
-    return data.items || [];
+    try {
+      const res = await fetch(`${API_BASE}/premium/items/${courseId}`);
+      const data = await safeJson(res, 'Failed to fetch premium items');
+      const items = data.items || [];
+      try {
+        localStorage.setItem(`polytechnic_cache_items_${courseId}`, JSON.stringify(items));
+      } catch (e) {}
+      return items;
+    } catch (err) {
+      try {
+        const cached = localStorage.getItem(`polytechnic_cache_items_${courseId}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+      return [];
+    }
   },
   async createPremiumItem(itemData: any): Promise<any> {
     const res = await fetch(`${API_BASE}/premium/items`, {
@@ -164,10 +188,21 @@ export const api = {
   },
   // Public APIs
   async getPublicTree(): Promise<StudyItem[]> {
-    const res = await fetch(`${API_BASE}/public/tree`);
-    const data = await safeJson(res, 'Failed to fetch library tree');
-    if (!data.success) throw new Error(data.error || 'Failed to fetch library tree');
-    return data.items;
+    try {
+      const res = await fetch(`${API_BASE}/public/tree`);
+      const data = await safeJson(res, 'Failed to fetch library tree');
+      if (!data.success) throw new Error(data.error || 'Failed to fetch library tree');
+      try {
+        localStorage.setItem('polytechnic_cache_public_tree', JSON.stringify(data.items));
+      } catch (e) {}
+      return data.items;
+    } catch (err) {
+      try {
+        const cached = localStorage.getItem('polytechnic_cache_public_tree');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+      throw err;
+    }
   },
 
   async getPublicItem(id: string): Promise<{ item: StudyItem; breadcrumbs: Array<{ id: string | null; name: string }> }> {
@@ -178,10 +213,21 @@ export const api = {
   },
 
   async getPublicStats(): Promise<LibraryStats> {
-    const res = await fetch(`${API_BASE}/public/stats`);
-    const data = await safeJson(res, 'Failed to fetch library statistics');
-    if (!data.success) throw new Error(data.error || 'Failed to fetch library statistics');
-    return data.stats;
+    try {
+      const res = await fetch(`${API_BASE}/public/stats`);
+      const data = await safeJson(res, 'Failed to fetch library statistics');
+      if (!data.success) throw new Error(data.error || 'Failed to fetch library statistics');
+      try {
+        localStorage.setItem('polytechnic_cache_public_stats', JSON.stringify(data.stats));
+      } catch (e) {}
+      return data.stats;
+    } catch (err) {
+      try {
+        const cached = localStorage.getItem('polytechnic_cache_public_stats');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+      throw err;
+    }
   },
 
   // Auth APIs
@@ -263,7 +309,9 @@ export const api = {
     displayType?: 'pdf' | 'html' | 'video' | 'link',
     isVideo?: boolean,
     thumbnailUrl?: string,
-    videoTitle?: string
+    videoTitle?: string,
+    isPremium?: boolean,
+    accessType?: 'free' | 'premium' | 'both'
   ): Promise<StudyItem> {
     const res = await fetch(`${API_BASE}/admin/create-file-record`, {
       method: 'POST',
@@ -284,7 +332,9 @@ export const api = {
         displayType,
         isVideo,
         thumbnailUrl,
-        videoTitle
+        videoTitle,
+        isPremium,
+        accessType
       })
     });
     const data = await safeJson(res, 'Failed to create file record');
@@ -431,6 +481,25 @@ export const api = {
     const result = await safeJson(res, 'Login failed');
     if (!result.success) throw new Error(result.error || 'Login failed');
     return result.user;
+  },
+  async syncPremiumUser(internalId: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/premium-users/sync/${encodeURIComponent(internalId)}`);
+      const data = await safeJson(res, 'Sync failed');
+      return data.success ? data.user : null;
+    } catch {
+      return null;
+    }
+  },
+  async updatePremiumUserProfile(internalId: string, profileData: { photoUrl?: string; name?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/premium-users/update-profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ internalId, ...profileData })
+    });
+    const data = await safeJson(res, 'Failed to update profile');
+    if (!data.success) throw new Error(data.error || 'Failed to update profile');
+    return data.user;
   },
   async getAdminPremiumUsers(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/admin/premium-users`, {

@@ -152,7 +152,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Welcome to <span className="text-blue-600">PolyHub</span>
+              Welcome to <span className="text-blue-600">Polytechnic Hub</span>
             </h1>
             <p className="text-sm text-slate-500 max-w-md">
               Your digital study library. Browse notes, previous year questions, and curriculum files effortlessly.
@@ -160,17 +160,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {onOpenDriveReader && (
-              <button
-                onClick={onOpenDriveReader}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 shadow-sm transition-all flex items-center space-x-2 cursor-pointer"
-                title="Open Google Drive Fullscreen PDF Reader"
-              >
-                <FileText className="w-4 h-4 text-cyan-400" />
-                <span>Drive PDF</span>
-              </button>
-            )}
-
             <button
               onClick={() => onOpenPremiumCourse && onOpenPremiumCourse()}
               className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 shadow-sm transition-all flex items-center space-x-2"

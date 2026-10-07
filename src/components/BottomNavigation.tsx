@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, FolderTree, Search, User, LogOut, Shield } from 'lucide-react';
+import { Home, FolderTree, Search, User, LogOut, Shield, Sparkles } from 'lucide-react';
 
 interface BottomNavProps {
   currentView: 'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses';
@@ -19,50 +19,60 @@ export const BottomNavigation: React.FC<BottomNavProps> = ({
       <nav className="flex items-center justify-around h-16 px-2">
         <button
           onClick={() => onNavigate('home')}
-          className={`flex flex-col items-center justify-center w-16 h-full space-y-1 transition-colors ${
+          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
             currentView === 'home' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <Home className={`w-6 h-6 ${currentView === 'home' ? 'fill-blue-100/50' : ''}`} />
+          <Home className={`w-5 h-5 ${currentView === 'home' ? 'fill-blue-100/50' : ''}`} />
           <span className="text-[10px] font-semibold">Home</span>
         </button>
 
         <button
           onClick={() => onNavigate('browse')}
-          className={`flex flex-col items-center justify-center w-16 h-full space-y-1 transition-colors ${
+          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
             currentView === 'browse' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <FolderTree className={`w-6 h-6 ${currentView === 'browse' ? 'fill-blue-100/50' : ''}`} />
+          <FolderTree className={`w-5 h-5 ${currentView === 'browse' ? 'fill-blue-100/50' : ''}`} />
           <span className="text-[10px] font-semibold">Library</span>
         </button>
 
         <button
-          onClick={onOpenSearch}
-          className="flex flex-col items-center justify-center w-16 h-full space-y-1 text-slate-500 hover:text-slate-900 transition-colors"
+          onClick={() => onNavigate('premium-courses')}
+          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
+            currentView === 'premium-courses' || currentView === 'premium' ? 'text-amber-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+          }`}
         >
-          <Search className="w-6 h-6" />
+          <Sparkles className={`w-5 h-5 ${currentView === 'premium-courses' ? 'text-amber-500 fill-amber-100/50' : ''}`} />
+          <span className="text-[10px] font-semibold">Premium</span>
+        </button>
+
+        <button
+          onClick={onOpenSearch}
+          className="flex flex-col items-center justify-center w-14 h-full space-y-1 text-slate-500 hover:text-slate-900 transition-colors"
+        >
+          <Search className="w-5 h-5" />
           <span className="text-[10px] font-semibold">Search</span>
         </button>
 
         <button
           onClick={() => onNavigate('about')}
-          className={`flex flex-col items-center justify-center w-16 h-full space-y-1 transition-colors ${
+          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
             currentView === 'about' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <User className={`w-6 h-6 ${currentView === 'about' ? 'fill-blue-100/50' : ''}`} />
+          <User className={`w-5 h-5 ${currentView === 'about' ? 'fill-blue-100/50' : ''}`} />
           <span className="text-[10px] font-semibold">About</span>
         </button>
 
         {isAdmin && (
           <button
             onClick={() => onNavigate('admin')}
-            className={`flex flex-col items-center justify-center w-16 h-full space-y-1 transition-colors ${
-              currentView === 'admin' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
+            className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
+              currentView === 'admin' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
-            <Shield className={`w-6 h-6 ${currentView === 'admin' ? 'fill-blue-100/50' : ''}`} />
+            <Shield className={`w-5 h-5 ${currentView === 'admin' ? 'fill-blue-100/50' : ''}`} />
             <span className="text-[10px] font-semibold">Admin</span>
           </button>
         )}

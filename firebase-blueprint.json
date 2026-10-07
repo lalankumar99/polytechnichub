@@ -7,32 +7,93 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "type": "string", "enum": ["folder", "pdf", "html"] },
+        "type": { "type": "string", "enum": ["folder", "pdf", "html", "youtube", "link"] },
         "parentId": { "type": "string", "description": "Null if root level." },
         "status": { "type": "string", "enum": ["published", "draft", "unpublished"] },
         "size": { "type": "number" },
         "fileUrl": { "type": "string" },
-        "fileData": { "type": "string" },
-        "chunksCount": { "type": "number" },
-        "content": { "type": "string" },
         "description": { "type": "string" },
         "branch": { "type": "string" },
         "semester": { "type": "string" },
         "subject": { "type": "string" },
         "unit": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
+        "isPremium": { "type": "boolean" },
+        "accessType": { "type": "string", "enum": ["free", "premium", "both"] },
         "downloadsCount": { "type": "number" },
         "viewsCount": { "type": "number" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["id", "name", "type", "status", "size", "downloadsCount", "viewsCount", "createdAt", "updatedAt"]
+      "required": ["id", "name", "type", "status", "size", "createdAt", "updatedAt"]
+    },
+    "PremiumUser": {
+      "title": "PremiumUser",
+      "description": "Represents a student registered for premium course access awaiting or granted admin approval.",
+      "type": "object",
+      "properties": {
+        "internalId": { "type": "string" },
+        "id": { "type": "string", "description": "Assigned student ID like PH-101" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "password": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["internalId", "name", "email", "mobile", "status", "createdAt"]
+    },
+    "PremiumCourse": {
+      "title": "PremiumCourse",
+      "description": "Represents a structured premium course module.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "bannerUrl": { "type": "string" },
+        "branch": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "price", "status", "createdAt", "updatedAt"]
+    },
+    "PremiumItem": {
+      "title": "PremiumItem",
+      "description": "Represents a lesson, PDF, note, or video inside a premium course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["folder", "pdf", "video", "youtube", "link", "note"] },
+        "parentId": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "courseId", "name", "type", "status", "createdAt"]
     }
   },
   "firestore": {
     "studyItems/{itemId}": {
       "schema": { "$ref": "#/entities/StudyItem" },
-      "description": "The collection of all folders and study materials."
+      "description": "The collection of all library folders and study materials."
+    },
+    "premiumUsers/{userId}": {
+      "schema": { "$ref": "#/entities/PremiumUser" },
+      "description": "Registered students for premium courses with admin approval status."
+    },
+    "premiumCourses/{courseId}": {
+      "schema": { "$ref": "#/entities/PremiumCourse" },
+      "description": "Exclusive polytechnic courses and study programs."
+    },
+    "premiumItems/{itemId}": {
+      "schema": { "$ref": "#/entities/PremiumItem" },
+      "description": "Individual lessons, videos, and PDFs inside premium courses."
     }
   }
 }

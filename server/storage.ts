@@ -1,4 +1,4 @@
-import { StudyItem, LibraryStats, PremiumCourse, PremiumItem, PremiumAccessRequest, FeedbackSubmission } from '../src/types';
+import type { StudyItem, LibraryStats, PremiumCourse, PremiumItem, PremiumAccessRequest, FeedbackSubmission } from '../src/types.ts';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp, getApps } from 'firebase/app';
@@ -12,7 +12,11 @@ import {
   deleteDoc, 
   updateDoc
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+
+const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+const firebaseConfig = fs.existsSync(configPath)
+  ? JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+  : {};
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -60,6 +64,30 @@ function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<str
   return result;
 }
 
+function autoTagVideos(items: StudyItem[]): StudyItem[] {
+  const ytRegex = /(?:youtu\.be\/|(?:www\.|m\.)?youtube\.com\/(?:embed\/|v\/|watch\?(?:.*&)?v=|shorts\/))([a-zA-Z0-9_-]{11})/;
+  return items.map(item => {
+    const url = item.fileUrl || '';
+    const content = item.content || '';
+    const match = (url + ' ' + content).match(ytRegex);
+    const hasPlayer = content.includes('ph-video-player') || content.includes('class="video"') || (content.includes('<iframe') && !content.includes('drive.google.com') && !content.includes('docs.google.com'));
+    if (match || hasPlayer || item.type === 'youtube' || item.isVideo) {
+      const ytId = match ? match[1] : null;
+      return {
+        ...item,
+        isVideo: true,
+        displayType: 'video',
+        type: ytId ? 'youtube' : item.type,
+        thumbnailUrl: item.thumbnailUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined),
+        fileUrl: ytId && (!item.fileUrl || item.fileUrl.startsWith('/uploads/') || item.fileUrl.startsWith('/api/'))
+          ? `https://www.youtube.com/watch?v=${ytId}`
+          : item.fileUrl
+      };
+    }
+    return item;
+  });
+}
+
 class LibraryStorage {
   private data: DatabaseSchema;
   private isInitialized = false;
@@ -80,7 +108,7 @@ class LibraryStorage {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         return {
-          studyItems: Array.isArray(parsed.studyItems) ? parsed.studyItems : [],
+          studyItems: Array.isArray(parsed.studyItems) ? autoTagVideos(parsed.studyItems) : [],
           premiumUsers: Array.isArray(parsed.premiumUsers) ? parsed.premiumUsers : [],
           premiumCourses: Array.isArray(parsed.premiumCourses) ? parsed.premiumCourses : [],
           premiumItems: Array.isArray(parsed.premiumItems) ? parsed.premiumItems : [],
@@ -132,7 +160,7 @@ class LibraryStorage {
       itemsSnap.forEach(docSnap => {
         itemsList.push({ id: docSnap.id, ...(docSnap.data() as any) });
       });
-      this.data.studyItems = itemsList;
+      this.data.studyItems = autoTagVideos(itemsList);
       console.log(`[Storage] Synced ${itemsList.length} items from Firestore`);
 
       const coursesList: PremiumCourse[] = [];
@@ -146,6 +174,74 @@ class LibraryStorage {
         pItemsList.push({ id: docSnap.id, ...(docSnap.data() as any) });
       });
       this.data.premiumItems = pItemsList;
+
+      // Seed high-yield course modules if course has no items yet
+      if (this.data.premiumItems.length === 0 && this.data.premiumCourses.length > 0) {
+        const firstCourse = this.data.premiumCourses[0];
+        const defaultModules: PremiumItem[] = [
+          {
+            id: 'mod-1-' + firstCourse.id,
+            courseId: firstCourse.id,
+            name: 'Module 1: Electrical Machines - Complete Theory & Handout Notes (PDF)',
+            type: 'pdf',
+            parentId: null,
+            fileUrl: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?usp=sharing',
+            description: 'Comprehensive handwritten theory notes covering DC generators, motors, single-phase and 3-phase transformers.',
+            status: 'published',
+            size: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'mod-2-' + firstCourse.id,
+            courseId: firstCourse.id,
+            name: 'Module 2: Network Theorems & Circuit Analysis Formula Cheat Sheet (PDF)',
+            type: 'pdf',
+            parentId: null,
+            fileUrl: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?usp=sharing',
+            description: 'Thevenin, Norton, Superposition, Maximum Power Transfer Theorem with solved numericals.',
+            status: 'published',
+            size: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'mod-3-' + firstCourse.id,
+            courseId: firstCourse.id,
+            name: 'Module 3: Power Systems & Transmission Line Modeling (Masterclass Video)',
+            type: 'youtube',
+            parentId: null,
+            fileUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            description: 'In-depth conceptual lecture on transmission line parameters, fault analysis, and switchgear protection.',
+            status: 'published',
+            size: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'mod-4-' + firstCourse.id,
+            courseId: firstCourse.id,
+            name: 'Module 4: 5,000+ Topic-Wise PYQs Question Bank & Answer Key (PDF)',
+            type: 'pdf',
+            parentId: null,
+            fileUrl: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?usp=sharing',
+            description: 'Exclusive question bank with solutions for SSC JE, RRB JE, and State AE/JE examinations.',
+            status: 'published',
+            size: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ];
+        this.data.premiumItems = defaultModules;
+        this.saveDiskCache();
+        for (const item of defaultModules) {
+          try {
+            await setDoc(doc(firestoreDb, 'premiumItems', item.id), sanitizeForFirestore(item), { merge: true });
+          } catch (e) {
+            console.error('[Storage] Error seeding premiumItem:', e);
+          }
+        }
+      }
 
       const pUsersList: any[] = [];
       pUsersSnap.forEach(docSnap => {
@@ -658,7 +754,13 @@ class LibraryStorage {
 
   public async getPremiumUserByEmailOrMobile(identifier: string): Promise<any | null> {
     await this.ensureReady();
-    return this.data.premiumUsers.find(u => u.email === identifier || u.mobile === identifier || u.id === identifier) || null;
+    const clean = identifier.trim().toLowerCase();
+    return this.data.premiumUsers.find(u =>
+      u.email?.toLowerCase() === clean ||
+      u.mobile?.trim() === identifier.trim() ||
+      u.id?.toLowerCase() === clean ||
+      u.internalId === identifier.trim()
+    ) || null;
   }
 
   public async createPremiumUser(data: any): Promise<any> {
@@ -666,8 +768,10 @@ class LibraryStorage {
     const user = {
       ...data,
       internalId: newId,
-      id: '',
-      status: 'pending',
+      id: data.id || '',
+      photoUrl: data.photoUrl || '',
+      status: data.status || 'pending',
+      assignedCourseIds: data.assignedCourseIds || [],
       createdAt: new Date().toISOString()
     };
     this.data.premiumUsers.push(user);
@@ -686,7 +790,7 @@ class LibraryStorage {
       this.data.premiumUsers[index] = { ...this.data.premiumUsers[index], ...updates };
       this.saveDiskCache();
       try {
-        await updateDoc(doc(firestoreDb, 'premiumUsers', internalId), sanitizeForFirestore(updates));
+        await setDoc(doc(firestoreDb, 'premiumUsers', internalId), sanitizeForFirestore(this.data.premiumUsers[index]), { merge: true });
       } catch (e) {
         console.error('[Storage] Error updating premiumUser in Firestore:', e);
       }

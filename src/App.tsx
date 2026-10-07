@@ -1,6 +1,8 @@
 import { BottomNavigation } from './components/BottomNavigation';
 import { PremiumPortal } from './components/PremiumPortal';
 import { PremiumCoursesView } from './components/PremiumCoursesView';
+import { PremiumCourseView } from './components/PremiumCourseView';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -16,7 +18,8 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { api, authState } from './services/api';
 import { auth } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { StudyItem, LibraryStats, AdminUser } from './types';
+import { StudyItem, LibraryStats, AdminUser, PremiumCourse } from './types';
+import { getEffectiveDisplayType } from './utils/formatters';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses'>('home');
@@ -39,7 +42,9 @@ export default function App() {
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
   const [showPremiumPortal, setShowPremiumPortal] = useState(false);
+  const [selectedPremiumCourse, setSelectedPremiumCourse] = useState<PremiumCourse | null>(null);
   const [showDriveReaderModal, setShowDriveReaderModal] = useState<boolean>(false);
+  const [adminTriggerAddDrivePdf, setAdminTriggerAddDrivePdf] = useState<boolean>(false);
   const [activeDriveSource, setActiveDriveSource] = useState<{ source: string; title?: string } | null>(null);
   const [premiumUser, setPremiumUser] = useState<any>(() => {
     try {
@@ -56,6 +61,20 @@ export default function App() {
     } catch (e) { return null; }
   });
   const [initialFullscreenPref, setInitialFullscreenPref] = useState<boolean>(false);
+
+  // Background sync stored student user profile, status and assigned courses
+  useEffect(() => {
+    if (premiumUser?.internalId) {
+      api.syncPremiumUser(premiumUser.internalId)
+        .then(freshUser => {
+          if (freshUser) {
+            setPremiumUser(freshUser);
+            localStorage.setItem('polytechnic_premium_user', JSON.stringify(freshUser));
+          }
+        })
+        .catch(err => console.error('Error background-syncing premium student user:', err));
+    }
+  }, []);
 
   
   useEffect(() => {
@@ -107,6 +126,16 @@ export default function App() {
       setShowLoginModal(true);
       return;
     }
+    if (view === 'premium' || view === 'premium-courses') {
+      if (!premiumUser || premiumUser.status !== 'approved') {
+        setShowPremiumPortal(true);
+        return;
+      }
+      setCurrentView('premium-courses');
+      setSelectedPremiumCourse(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setCurrentView(view);
     if (view === 'browse') {
       setCurrentFolderId(folderId);
@@ -115,7 +144,13 @@ export default function App() {
   };
 
   const handleOpenPremiumCourse = () => {
-    setShowPremiumPortal(true);
+    if (!premiumUser || premiumUser.status !== 'approved') {
+      setShowPremiumPortal(true);
+    } else {
+      setCurrentView('premium-courses');
+      setSelectedPremiumCourse(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleOpenFolder = (folderId: string) => {
@@ -140,7 +175,14 @@ export default function App() {
       }
     }
 
-    const isVideo = file.type === 'youtube' || file.isVideo || (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be')));
+    const effType = getEffectiveDisplayType(file);
+    const isVideo = effType === 'video' || file.type === 'youtube' || file.isVideo || (file.fileUrl && (file.fileUrl.includes('youtube.com') || file.fileUrl.includes('youtu.be')));
+
+    // Google Drive direct viewer (Only for actual PDF documents, NOT videos)
+    if (!isVideo && file.fileUrl && (file.fileUrl.includes('drive.google.com') || file.fileUrl.includes('docs.google.com'))) {
+      setActiveDriveSource({ source: file.fileUrl, title: file.name });
+      return;
+    }
     if (isVideo) {
       try {
         if (document.documentElement.requestFullscreen) {
@@ -204,6 +246,9 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-cyan-500/30 selection:text-slate-900">
       
+      {/* Offline Status Monitor & Popup */}
+      <OfflineIndicator onRetryConnection={loadPublicData} />
+
       {/* Header */}
       <Header
         currentView={currentView}
@@ -217,7 +262,10 @@ export default function App() {
           localStorage.removeItem('polytechnic_premium_user');
           setPremiumUser(null);
         }}
-        onOpenDriveReader={() => setShowDriveReaderModal(true)}
+        onOpenAdminAddDrivePdf={() => {
+          setCurrentView('admin');
+          setAdminTriggerAddDrivePdf(true);
+        }}
       />
 
       {/* Main Content Area */}
@@ -228,7 +276,6 @@ export default function App() {
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenFile={handleInitiateOpenFile}
             onOpenPremiumCourse={handleOpenPremiumCourse}
-            onOpenDriveReader={() => setShowDriveReaderModal(true)}
             stats={publicStats}
             items={filteredItems}
           />
@@ -252,7 +299,41 @@ export default function App() {
           <AdminDashboard
             onOpenFile={handleInitiateOpenFile}
             onRefreshPublicData={loadPublicData}
+            triggerAddDrivePdf={adminTriggerAddDrivePdf}
+            onResetTriggerAddDrivePdf={() => setAdminTriggerAddDrivePdf(false)}
           />
+        )}
+
+        {/* Premium Polytechnic Courses (Assigned to Student & Admin Control) */}
+        {(currentView === 'premium' || currentView === 'premium-courses') && (
+          selectedPremiumCourse ? (
+            <PremiumCourseView
+              course={selectedPremiumCourse}
+              onBack={() => setSelectedPremiumCourse(null)}
+              user={premiumUser}
+              isAdmin={!!adminUser}
+              onOpenFile={handleInitiateOpenFile}
+              onOpenPremiumLogin={() => setShowPremiumPortal(true)}
+            />
+          ) : (
+            <PremiumCoursesView
+              onOpenLogin={() => setShowPremiumPortal(true)}
+              premiumUser={premiumUser}
+              isAdmin={!!adminUser}
+              onOpenFile={handleInitiateOpenFile}
+              onOpenCourse={async (courseId) => {
+                try {
+                  const course = await api.getPremiumCourse(courseId);
+                  if (course) {
+                    setSelectedPremiumCourse(course);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                } catch (err) {
+                  console.error('Failed to open course:', err);
+                }
+              }}
+            />
+          )
         )}
       
       </main>
@@ -284,14 +365,16 @@ export default function App() {
         />
       )}
 
-      {/* Google Drive Reader Input Modal */}
-      <DriveReaderModal
-        isOpen={showDriveReaderModal}
-        onClose={() => setShowDriveReaderModal(false)}
-        onLaunchViewer={(source, title) => {
-          setActiveDriveSource({ source, title });
-        }}
-      />
+      {/* Google Drive Reader Input Modal (Admin Only) */}
+      {adminUser && (
+        <DriveReaderModal
+          isOpen={showDriveReaderModal}
+          onClose={() => setShowDriveReaderModal(false)}
+          onLaunchViewer={(source, title) => {
+            setActiveDriveSource({ source, title });
+          }}
+        />
+      )}
 
       
       {/* Premium Student Portal (Login/Register) */}
@@ -300,6 +383,8 @@ export default function App() {
           onLoginSuccess={(user) => {
             setPremiumUser(user);
             setShowPremiumPortal(false);
+            setCurrentView('premium-courses');
+            setSelectedPremiumCourse(null);
           }}
           onClose={() => setShowPremiumPortal(false)}
         />

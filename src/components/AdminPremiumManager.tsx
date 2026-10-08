@@ -203,7 +203,9 @@ export const AdminPremiumManager: React.FC = () => {
   };
 
   const handleDeleteUser = async (internalId: string) => {
-    if (!confirm('Are you sure you want to delete this user? They will lose all premium access.')) return;
+    const user = users.find(u => u.internalId === internalId);
+    const identifier = user ? `${user.name} (${user.mobile || user.id})` : internalId;
+    if (!confirm(`ADMIN CONFIRMATION:\n\nAre you sure you want to delete student "${identifier}"?\n\nStudents are NEVER automatically deleted by the system. Only proceed if you explicitly wish to remove this student.`)) return;
     try {
       await api.deleteAdminPremiumUser(internalId);
       loadData();
@@ -384,13 +386,47 @@ export const AdminPremiumManager: React.FC = () => {
         
         /* ---------------- STUDENT APPROVALS & COURSE ALLOCATION ---------------- */
         <div className="space-y-4">
-          <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center space-x-2.5">
-              <Shield className="w-5 h-5 text-indigo-600 shrink-0" />
+          
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+                {users.length}
+              </div>
               <div>
-                <p className="font-bold text-indigo-950">Admin Course Allocation Rule</p>
-                <p className="text-indigo-800/80 mt-0.5">
-                  Only the courses selected by the Admin will be visible and unlocked for that student. You can assign 1, 2, 3, or all courses, or revoke them anytime.
+                <p className="text-[11px] font-bold text-slate-500 uppercase">Total Registered</p>
+                <p className="text-sm font-extrabold text-slate-900">{users.length} Students</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-emerald-200 rounded-2xl p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+                {users.filter(u => u.status === 'approved').length}
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-emerald-600 uppercase">Approved Students</p>
+                <p className="text-sm font-extrabold text-emerald-950">{users.filter(u => u.status === 'approved').length} Active Access</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-amber-200 rounded-2xl p-3.5 shadow-xs flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+                {users.filter(u => u.status === 'pending').length}
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-amber-600 uppercase">Pending Review</p>
+                <p className="text-sm font-extrabold text-amber-950">{users.filter(u => u.status === 'pending').length} Requests</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-2.5">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div>
+                <p className="font-extrabold text-emerald-950">Permanent Student Data Protection</p>
+                <p className="text-emerald-800 mt-0.5">
+                  Student accounts and approvals are permanently saved. Students are <strong>NEVER automatically deleted without Admin</strong> action.
                 </p>
               </div>
             </div>

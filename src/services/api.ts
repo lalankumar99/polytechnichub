@@ -522,6 +522,18 @@ export const api = {
       return null;
     }
   },
+  async checkPremiumUserStatus(identifier: string): Promise<{ success: boolean; notFound?: boolean; user?: any; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/premium-users/check-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier })
+      });
+      return await safeJson(res, 'Failed to check status');
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Status check failed' };
+    }
+  },
   async updatePremiumUserProfile(internalId: string, profileData: { photoUrl?: string; name?: string }): Promise<any> {
     const res = await fetch(`${API_BASE}/premium-users/update-profile`, {
       method: 'POST',

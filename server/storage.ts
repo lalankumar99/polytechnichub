@@ -248,9 +248,30 @@ class LibraryStorage {
 
       const pUsersList: any[] = [];
       pUsersSnap.forEach(docSnap => {
-        pUsersList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        const uData = docSnap.data() as any;
+        pUsersList.push({
+          ...uData,
+          internalId: uData.internalId || docSnap.id,
+          id: uData.id || ''
+        });
       });
-      this.data.premiumUsers = pUsersList;
+
+      // Strict student persistence safeguard: NEVER automatically delete or wipe students.
+      // Merge Firestore documents with local disk cache so no student record is ever lost.
+      const existingUsersMap = new Map<string, any>();
+      (this.data.premiumUsers || []).forEach(u => {
+        const key = u.internalId || u.id || u.mobile;
+        if (key) existingUsersMap.set(key, u);
+      });
+      pUsersList.forEach(u => {
+        const key = u.internalId || u.id || u.mobile;
+        if (key) {
+          const prev = existingUsersMap.get(key) || {};
+          existingUsersMap.set(key, { ...prev, ...u });
+        }
+      });
+      this.data.premiumUsers = Array.from(existingUsersMap.values());
+      console.log(`[Storage] Synced and preserved ${this.data.premiumUsers.length} premium students safely`);
 
       const reqList: PremiumAccessRequest[] = [];
       reqSnap.forEach(docSnap => {
@@ -757,13 +778,26 @@ class LibraryStorage {
 
   public async getPremiumUserByEmailOrMobile(identifier: string): Promise<any | null> {
     await this.ensureReady();
+    if (!identifier) return null;
     const clean = identifier.trim().toLowerCase();
-    return this.data.premiumUsers.find(u =>
-      u.email?.toLowerCase() === clean ||
-      u.mobile?.trim() === identifier.trim() ||
-      u.id?.toLowerCase() === clean ||
-      u.internalId === identifier.trim()
-    ) || null;
+    const cleanDigits = identifier.replace(/\D/g, '');
+    const last10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : (cleanDigits.length >= 7 ? cleanDigits : null);
+
+    return this.data.premiumUsers.find(u => {
+      const uEmail = u.email ? u.email.trim().toLowerCase() : '';
+      const uMobile = u.mobile ? u.mobile.trim() : '';
+      const uMobileDigits = uMobile.replace(/\D/g, '');
+      const uLast10 = uMobileDigits.length >= 10 ? uMobileDigits.slice(-10) : (uMobileDigits.length >= 7 ? uMobileDigits : null);
+      const uId = u.id ? u.id.trim().toLowerCase() : '';
+      const uInternal = u.internalId ? u.internalId.trim() : '';
+
+      if (uEmail && uEmail === clean) return true;
+      if (uId && uId === clean) return true;
+      if (uInternal && uInternal === identifier.trim()) return true;
+      if (uMobile && uMobile.toLowerCase() === clean) return true;
+      if (last10 && uLast10 && last10 === uLast10) return true;
+      return false;
+    }) || null;
   }
 
   public async createPremiumUser(data: any): Promise<any> {

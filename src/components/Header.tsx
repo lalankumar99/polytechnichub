@@ -8,7 +8,9 @@ import {
   SlidersHorizontal,
   GraduationCap,
   FileText,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  CheckCircle
 } from 'lucide-react';
 import { AdminUser, PremiumCourse } from '../types';
 import { StudentNotificationCenter } from './StudentNotificationCenter';
@@ -23,6 +25,7 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onLogout: () => void;
   onOpenAdminAddDrivePdf?: () => void;
+  onOpenPremiumLogin?: () => void;
   courses?: PremiumCourse[];
   onJoinLiveCourse?: (course: PremiumCourse) => void;
 }
@@ -37,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   premiumUser,
   onPremiumLogout,
   onOpenAdminAddDrivePdf,
+  onOpenPremiumLogin,
   courses = [],
   onJoinLiveCourse
 }) => {
@@ -182,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
             
             {/* Desktop Student Profile Display */}
             {premiumUser && !adminUser && (
-              <div className="hidden md:flex items-center space-x-2 bg-indigo-50/80 border border-indigo-200/80 rounded-2xl p-1.5 pl-2 shadow-xs">
+              <div className="hidden md:flex items-center space-x-2 bg-emerald-50/90 border border-emerald-300 rounded-2xl p-1.5 pl-2 shadow-xs">
                 <button
                   onClick={() => onNavigate('premium-courses')}
                   className="flex items-center space-x-2 text-left cursor-pointer hover:opacity-90 transition-opacity"
@@ -192,10 +196,10 @@ export const Header: React.FC<HeaderProps> = ({
                     <img
                       src={premiumUser.photoUrl}
                       alt={premiumUser.name}
-                      className="w-8 h-8 rounded-full object-cover border-2 border-indigo-500 shadow-sm shrink-0"
+                      className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500 shadow-sm shrink-0"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 text-white flex items-center justify-center text-xs font-black shadow-sm shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-black shadow-sm shrink-0">
                       {premiumUser.name ? premiumUser.name.charAt(0).toUpperCase() : 'S'}
                     </div>
                   )}
@@ -203,9 +207,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <span className="text-xs font-bold text-slate-900 max-w-[130px] truncate leading-tight">
                       {premiumUser.name}
                     </span>
-                    <span className="text-[10px] font-semibold text-emerald-600 flex items-center space-x-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span>{premiumUser.id || 'Premium Student'}</span>
+                    <span className="text-[10px] font-extrabold text-emerald-700 flex items-center space-x-1">
+                      <CheckCircle className="w-3 h-3 text-emerald-600" />
+                      <span>{premiumUser.id || 'Approved Student'}</span>
                     </span>
                   </div>
                 </button>
@@ -221,26 +225,32 @@ export const Header: React.FC<HeaderProps> = ({
             
             {/* Mobile Header Student Profile & Actions */}
             {premiumUser && !adminUser ? (
-              <div className="md:hidden flex items-center space-x-2 bg-indigo-50 border border-indigo-200/80 rounded-full py-1 px-2 shadow-xs">
+              <div className="md:hidden flex items-center space-x-1.5 bg-emerald-50 border border-emerald-300 rounded-full py-1 px-2.5 shadow-xs">
                 <button
                   onClick={() => onNavigate('premium-courses')}
                   className="flex items-center space-x-1.5 text-left cursor-pointer"
-                  title="My Premium Courses"
+                  title="Approved Student Profile & Courses"
                 >
                   {premiumUser.photoUrl ? (
                     <img
                       src={premiumUser.photoUrl}
                       alt={premiumUser.name}
-                      className="w-7 h-7 rounded-full object-cover border border-indigo-500 shadow-xs shrink-0"
+                      className="w-7 h-7 rounded-full object-cover border-2 border-emerald-500 shadow-xs shrink-0"
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                       {premiumUser.name ? premiumUser.name.charAt(0).toUpperCase() : 'S'}
                     </div>
                   )}
-                  <span className="text-xs font-bold text-indigo-950 max-w-[90px] truncate leading-none">
-                    {premiumUser.name}
-                  </span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-black text-emerald-950 max-w-[85px] truncate leading-none">
+                      {premiumUser.name}
+                    </span>
+                    <span className="text-[9px] font-extrabold text-emerald-700 leading-none flex items-center space-x-0.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Approved</span>
+                    </span>
+                  </div>
                 </button>
                 <button
                   onClick={onPremiumLogout}
@@ -251,12 +261,22 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             ) : !adminUser && (
-              <button
-                onClick={() => onNavigate('premium')}
-                className="md:hidden px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 font-bold text-xs shadow-xs cursor-pointer"
-              >
-                Premium
-              </button>
+              <div className="md:hidden flex items-center space-x-1">
+                <button
+                  onClick={() => onOpenPremiumLogin ? onOpenPremiumLogin() : onNavigate('premium')}
+                  className="px-2.5 py-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-xs flex items-center space-x-1 cursor-pointer active:scale-95 transition-transform"
+                  title="Already Approved Student Login"
+                >
+                  <KeyRound className="w-3 h-3 text-amber-300" />
+                  <span>Login</span>
+                </button>
+                <button
+                  onClick={() => onNavigate('premium-courses')}
+                  className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 font-bold text-xs shadow-xs cursor-pointer active:scale-95 transition-transform"
+                >
+                  Courses
+                </button>
+              </div>
             )}
 
             {!adminUser && !premiumUser && (

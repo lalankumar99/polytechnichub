@@ -669,6 +669,40 @@ app.get('/api/premium-users/sync/:internalId', async (req, res) => {
   }
 });
 
+// Check student approval status without requiring password
+app.post('/api/premium-users/check-status', async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier || typeof identifier !== 'string') {
+      return res.status(400).json({ success: false, error: 'Please enter your Mobile number, Email, or Student ID' });
+    }
+    const user = await storage.getPremiumUserByEmailOrMobile(identifier);
+    if (!user) {
+      return res.json({
+        success: false,
+        notFound: true,
+        message: 'No student registration found with this Mobile number / Email. Please register as a new student.'
+      });
+    }
+    res.json({
+      success: true,
+      notFound: false,
+      user: {
+        name: user.name,
+        status: user.status,
+        id: user.id || user.internalId,
+        internalId: user.internalId,
+        mobile: user.mobile,
+        email: user.email,
+        photoUrl: user.photoUrl || '',
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Update student profile (e.g. photo or name)
 app.post('/api/premium-users/update-profile', async (req, res) => {
   try {

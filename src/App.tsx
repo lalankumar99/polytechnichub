@@ -51,6 +51,7 @@ export default function App() {
   const [selectedFileForRequirement, setSelectedFileForRequirement] = useState<StudyItem | null>(null);
   const [activeViewingFile, setActiveViewingFile] = useState<StudyItem | null>(null);
   const [showPremiumPortal, setShowPremiumPortal] = useState(false);
+  const [premiumPortalMode, setPremiumPortalMode] = useState<'login' | 'register'>('login');
   const [selectedPremiumCourse, setSelectedPremiumCourse] = useState<PremiumCourse | null>(null);
   const [showDriveReaderModal, setShowDriveReaderModal] = useState<boolean>(false);
   const [adminTriggerAddDrivePdf, setAdminTriggerAddDrivePdf] = useState<boolean>(false);
@@ -182,6 +183,7 @@ export default function App() {
     }
     if (view === 'premium' || view === 'premium-courses') {
       if (!premiumUser || premiumUser.status !== 'approved') {
+        setPremiumPortalMode('login');
         setShowPremiumPortal(true);
         return;
       }
@@ -199,6 +201,7 @@ export default function App() {
 
   const handleOpenPremiumCourse = () => {
     if (!premiumUser || premiumUser.status !== 'approved') {
+      setPremiumPortalMode('login');
       setShowPremiumPortal(true);
     } else {
       setCurrentView('premium-courses');
@@ -322,6 +325,10 @@ export default function App() {
           setCurrentView('admin');
           setAdminTriggerAddDrivePdf(true);
         }}
+        onOpenPremiumLogin={() => {
+          setPremiumPortalMode('login');
+          setShowPremiumPortal(true);
+        }}
       />
 
       {/* Global Live Class Announcement Notification for All Students */}
@@ -443,6 +450,7 @@ export default function App() {
       {/* Premium Student Portal (Login/Register) */}
       {showPremiumPortal && (
         <PremiumPortal 
+          initialMode={premiumPortalMode}
           onLoginSuccess={(user) => {
             setPremiumUser(user);
             setShowPremiumPortal(false);

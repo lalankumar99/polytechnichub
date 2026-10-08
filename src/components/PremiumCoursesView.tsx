@@ -196,6 +196,40 @@ export const PremiumCoursesView: React.FC<PremiumCoursesViewProps> = ({
         </div>
       </div>
 
+      {/* ---------------- MOBILE NOTICE: ALREADY APPROVED BY ADMIN? ---------------- */}
+      {!isApprovedStudent && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-blue-500/15 border-2 border-amber-300 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center space-x-3 text-left w-full sm:w-auto">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md font-black text-xl">
+              🔑
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight">
+                Already approved by Admin?
+              </h3>
+              <p className="text-xs text-slate-600 font-medium mt-0.5">
+                एडमिन द्वारा अप्रूव्ड छात्र सीधे अपने मोबाइल नंबर से लॉगिन करें (Accounts are permanently safe)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={onOpenLogin}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-black shadow-md shadow-indigo-600/20 flex items-center justify-center space-x-1.5 transition-all cursor-pointer active:scale-95"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-300" />
+              <span>Log In with Mobile / ID</span>
+            </button>
+            <button
+              onClick={onOpenLogin}
+              className="flex-1 sm:flex-none px-3.5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
+            >
+              Check Status
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ---------------- MOBILE SEARCH & BRANCH FILTER BAR ---------------- */}
       <div className="space-y-3">
         {/* Search Input */}

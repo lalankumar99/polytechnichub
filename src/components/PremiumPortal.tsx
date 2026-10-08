@@ -111,11 +111,11 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md overflow-y-auto animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl relative my-8 border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/70 backdrop-blur-md overflow-y-auto animate-fade-in font-sans">
+      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl relative my-auto sm:my-8 border border-slate-200">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-700 p-6 sm:p-8 text-white relative">
+        <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-blue-700 p-5 sm:p-8 text-white relative">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
@@ -127,12 +127,12 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
           </button>
           
           <div className="flex items-center space-x-3 mb-2">
-            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
-              <Shield className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-black">Polytechnic Premium</h2>
-              <span className="text-[11px] font-bold text-amber-300 tracking-wider uppercase">
+              <h2 className="text-lg sm:text-2xl font-black">Polytechnic Premium</h2>
+              <span className="text-[10px] sm:text-[11px] font-bold text-amber-300 tracking-wider uppercase">
                 Official Student Portal
               </span>
             </div>
@@ -147,7 +147,7 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
         </div>
 
         {/* Content Body */}
-        <div className="p-6 sm:p-8 max-h-[75vh] overflow-y-auto">
+        <div className="p-4 sm:p-8 max-h-[78vh] overflow-y-auto">
           {error && (
             <div className="mb-6 p-4 bg-rose-50 text-rose-700 rounded-2xl flex items-start space-x-3 text-xs sm:text-sm font-semibold border border-rose-200 animate-shake">
               <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
@@ -276,7 +276,7 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
                   required
                   value={regName}
                   onChange={e => setRegName(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-base sm:text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
                   placeholder="e.g. Ramesh Kumar"
                 />
               </div>
@@ -290,7 +290,7 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
                   required
                   value={regEmail}
                   onChange={e => setRegEmail(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-base sm:text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
                   placeholder="ramesh@gmail.com"
                 />
               </div>
@@ -304,7 +304,7 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
                   required
                   value={regMobile}
                   onChange={e => setRegMobile(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-base sm:text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all"
                   placeholder="10 digit mobile number"
                 />
               </div>
@@ -319,7 +319,7 @@ export const PremiumPortal: React.FC<PremiumPortalProps> = ({ onLoginSuccess, on
                     required
                     value={regPassword}
                     onChange={e => setRegPassword(e.target.value)}
-                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all pr-10"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 sm:py-3 text-base sm:text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none transition-all pr-10"
                     placeholder="Minimum 6 characters"
                     minLength={6}
                   />

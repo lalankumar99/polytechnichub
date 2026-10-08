@@ -93,11 +93,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700/90 rounded-2xl w-full max-w-2xl text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-3 sm:pt-20 px-2 sm:px-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div className="bg-slate-900 border border-slate-700/90 rounded-2xl w-full max-w-2xl text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[80vh]">
         
         {/* Search Input Bar */}
-        <div className="p-4 border-b border-slate-800 flex items-center space-x-3 bg-slate-900/90">
+        <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center space-x-2.5 sm:space-x-3 bg-slate-900/90">
           <Search className="w-5 h-5 text-cyan-400 shrink-0" />
           <input
             type="text"
@@ -105,7 +105,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search notes, subjects, branches, units, formulas (e.g. KCL, DSA, Thermo)..."
             autoFocus
-            className="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none"
+            className="w-full bg-transparent text-base sm:text-sm text-white placeholder-slate-400 focus:outline-none"
           />
           {query && (
             <button

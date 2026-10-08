@@ -42,9 +42,11 @@ export const PremiumSection: React.FC<PremiumSectionProps> = ({ onOpenCourse }) 
               className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 cursor-pointer transition-all group"
             >
               {course.bannerUrl ? (
-                <img src={course.bannerUrl} alt={course.name} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="w-full aspect-[16/9] overflow-hidden bg-slate-900">
+                  <img src={course.bannerUrl} alt={course.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                </div>
               ) : (
-                <div className="w-full h-48 bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
+                <div className="w-full aspect-[16/9] bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
                   <Shield className="w-12 h-12 text-slate-600" />
                 </div>
               )}

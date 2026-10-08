@@ -621,27 +621,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div id="polytechnic-admin-dashboard" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div id="polytechnic-admin-dashboard" className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-8">
       
       {/* Admin Tabs */}
-      <div className="flex items-center space-x-4 border-b border-slate-200">
+      <div className="flex items-center space-x-3 sm:space-x-4 border-b border-slate-200 overflow-x-auto scrollbar-none pb-0.5">
         <button 
           onClick={() => setActiveTab('manager')}
-          className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'manager' ? 'border-cyan-500 text-cyan-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors cursor-pointer ${activeTab === 'manager' ? 'border-cyan-500 text-cyan-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           File Manager
         </button>
         <button 
           onClick={() => setActiveTab('premium')}
-          className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors flex items-center space-x-1 ${activeTab === 'premium' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors flex items-center space-x-1 cursor-pointer ${activeTab === 'premium' ? 'border-amber-500 text-amber-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
-          <Lock className="w-4 h-4 mr-1"/>
+          <Lock className="w-3.5 h-3.5 mr-0.5"/>
           Premium Courses
         </button>
       
         <button
           onClick={() => setActiveTab('feedback')}
-          className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'feedback' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          className={`pb-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors cursor-pointer ${activeTab === 'feedback' ? 'border-indigo-500 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
         >
           User Feedback
         </button>

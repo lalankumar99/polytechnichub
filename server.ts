@@ -808,6 +808,49 @@ app.delete('/api/premium/courses/:id', adminAuthMiddleware, async (req, res) => 
   }
 });
 
+// Quick toggle live status for a course
+app.post('/api/admin/courses/:id/toggle-live', adminAuthMiddleware, async (req, res) => {
+  try {
+    const course = await storage.getPremiumCourse(req.params.id);
+    if (!course) return res.status(404).json({ success: false, error: 'Course not found' });
+    const isLive = req.body.isLive !== undefined ? Boolean(req.body.isLive) : !course.isLive;
+    await storage.updatePremiumCourse(req.params.id, { isLive });
+    const updated = await storage.getPremiumCourse(req.params.id);
+    res.json({ success: true, course: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Live Chat API
+app.get('/api/live/chat/:courseId', async (req, res) => {
+  try {
+    const messages = await storage.getLiveMessages(req.params.courseId);
+    res.json({ success: true, messages });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/live/chat/:courseId', async (req, res) => {
+  try {
+    const { userName, userRole, message, userId } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'Message cannot be empty' });
+    }
+    const saved = await storage.addLiveMessage({
+      courseId: req.params.courseId,
+      userId: userId || 'student',
+      userName: (userName || 'Student').trim(),
+      userRole: userRole || 'student',
+      message: message.trim()
+    });
+    res.json({ success: true, message: saved });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/premium/items', adminAuthMiddleware, async (req, res) => {
   try {
     const item = await storage.createPremiumItem(req.body);

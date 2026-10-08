@@ -31,48 +31,48 @@ export default function About() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-indigo-100 selection:text-indigo-900">
       
       {/* Hero Section */}
-      <section className="relative pt-20 pb-16 md:pt-28 md:pb-24 overflow-hidden">
+      <section className="relative pt-8 pb-10 sm:pt-16 sm:pb-14 md:pt-24 md:pb-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-blue-50 z-0"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 text-indigo-700 font-medium text-sm mb-6 animate-pulse">
-            <Sparkles size={16} />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-medium text-xs sm:text-sm mb-4 animate-pulse">
+            <Sparkles size={14} />
             <span>Welcome to the future of learning</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight">
             Empowering the Next Generation of <br className="hidden md:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500">
               Polytechnic Engineers
             </span>
           </h1>
-          <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-600 leading-relaxed">
+          <p className="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-slate-600 leading-relaxed">
             Polytechnic Hub is more than just a website; it's a movement to provide top-notch resources, guidance, and a thriving community for diploma students across the nation.
           </p>
         </div>
       </section>
 
       {/* Mission & Vision Section */}
-      <section className="py-16 bg-white">
+      <section className="py-10 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+            <div className="space-y-4 sm:space-y-6">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
                 Bridging the Gap Between <span className="text-indigo-600">Theory and Industry</span>
               </h2>
-              <p className="text-slate-600 text-lg leading-relaxed">
+              <p className="text-slate-600 text-sm sm:text-base md:text-lg leading-relaxed">
                 We observed that while degree students have abundant resources, polytechnic and diploma students often struggle to find relevant, simplified, and practical study materials. 
               </p>
-              <p className="text-slate-600 text-lg leading-relaxed">
+              <p className="text-slate-600 text-sm sm:text-base md:text-lg leading-relaxed">
                 At Polytechnic Hub, we curate high-quality notes, project ideas, and career roadmaps specifically tailored for the diploma curriculum, ensuring you are industry-ready from day one.
               </p>
-              <ul className="space-y-4 mt-6">
+              <ul className="space-y-3 mt-4 sm:mt-6 text-xs sm:text-sm">
                 {[
                   '100% Free & Accessible Study Materials',
                   'Guidance for Lateral Entry (B.Tech) Exams',
                   'Latest Industry Trends & Tech Updates'
                 ].map((item, index) => (
                   <li key={index} className="flex items-center gap-3 text-slate-700 font-medium">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
                     </div>
                     {item}
                   </li>
@@ -81,7 +81,7 @@ export default function About() {
             </div>
             
             {/* Feature Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="bg-indigo-50 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                 <BookOpen className="text-indigo-600 mb-4" size={32} />
                 <h3 className="font-bold text-slate-900 text-lg mb-2">Smart Notes</h3>

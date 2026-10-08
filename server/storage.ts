@@ -1,4 +1,4 @@
-import type { StudyItem, LibraryStats, PremiumCourse, PremiumItem, PremiumAccessRequest, FeedbackSubmission } from '../src/types.ts';
+import type { StudyItem, LibraryStats, PremiumCourse, PremiumItem, PremiumAccessRequest, FeedbackSubmission, LiveChatMessage } from '../src/types.ts';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp, getApps } from 'firebase/app';
@@ -45,6 +45,7 @@ interface DatabaseSchema {
     liveEmbed: string;
     videos: any[];
   };
+  liveMessages?: LiveChatMessage[];
 }
 
 /**
@@ -114,7 +115,8 @@ class LibraryStorage {
           premiumItems: Array.isArray(parsed.premiumItems) ? parsed.premiumItems : [],
           premiumRequests: Array.isArray(parsed.premiumRequests) ? parsed.premiumRequests : [],
           feedback: Array.isArray(parsed.feedback) ? parsed.feedback : [],
-          studiverse: parsed.studiverse || { liveEmbed: '', videos: [] }
+          studiverse: parsed.studiverse || { liveEmbed: '', videos: [] },
+          liveMessages: Array.isArray(parsed.liveMessages) ? parsed.liveMessages : []
         };
       }
     } catch (err) {
@@ -128,7 +130,8 @@ class LibraryStorage {
       premiumItems: [],
       premiumRequests: [],
       feedback: [],
-      studiverse: { liveEmbed: '', videos: [] }
+      studiverse: { liveEmbed: '', videos: [] },
+      liveMessages: []
     };
   }
 
@@ -848,9 +851,38 @@ class LibraryStorage {
       try {
         await updateDoc(doc(firestoreDb, 'premiumCourses', id), sanitizeForFirestore(updates));
       } catch (e) {
-        console.error('[Storage] Error updating premiumCourse in Firestore:', e);
+        try {
+          await setDoc(doc(firestoreDb, 'premiumCourses', id), sanitizeForFirestore(this.data.premiumCourses[index]), { merge: true });
+        } catch (err2) {
+          console.error('[Storage] Error updating premiumCourse in Firestore:', err2);
+        }
       }
     }
+  }
+
+  // Live Chat System
+  public async getLiveMessages(courseId: string): Promise<LiveChatMessage[]> {
+    await this.ensureReady();
+    return (this.data.liveMessages || []).filter(m => m.courseId === courseId);
+  }
+
+  public async addLiveMessage(msg: Omit<LiveChatMessage, 'id' | 'createdAt'>): Promise<LiveChatMessage> {
+    const id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const newMsg: LiveChatMessage = {
+      ...msg,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    if (!this.data.liveMessages) {
+      this.data.liveMessages = [];
+    }
+    this.data.liveMessages.push(newMsg);
+    // Keep last 300 messages
+    if (this.data.liveMessages.length > 300) {
+      this.data.liveMessages = this.data.liveMessages.slice(-300);
+    }
+    this.saveDiskCache();
+    return newMsg;
   }
 
   public async deletePremiumCourse(id: string): Promise<void> {

@@ -71,9 +71,25 @@ export interface PremiumCourse {
   bannerUrl?: string;
   paymentLink?: string;
   status: ItemStatus;
+  // YouTube Live Stream Details
+  isLive?: boolean;
+  liveYoutubeUrl?: string; // YouTube Live URL or 11-char Video ID
+  liveScheduledTime?: string; // e.g. "Live Today at 6:00 PM"
+  liveTopic?: string; // Optional topic/title for the live stream
+  liveChatEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
   itemCount?: number;
+}
+
+export interface LiveChatMessage {
+  id: string;
+  courseId: string;
+  userId?: string;
+  userName: string;
+  userRole?: 'student' | 'admin' | 'instructor';
+  message: string;
+  createdAt: string;
 }
 
 export interface PremiumItem {

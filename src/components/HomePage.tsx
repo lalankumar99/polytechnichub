@@ -145,33 +145,33 @@ export const HomePage: React.FC<HomePageProps> = ({
   ];
 
   return (
-    <div id="polytechnic-home-view" className="space-y-16 pb-16">
+    <div id="polytechnic-home-view" className="space-y-8 sm:space-y-14 pb-12 sm:pb-16">
       
       {/* APP-STYLE DASHBOARD HERO */}
-      <section className="pt-6 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+      <section className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+          <div className="space-y-1.5 sm:space-y-2">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
               Welcome to <span className="text-blue-600">Polytechnic Hub</span>
             </h1>
-            <p className="text-sm text-slate-500 max-w-md">
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed">
               Your digital study library. Browse notes, previous year questions, and curriculum files effortlessly.
             </p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               onClick={() => onOpenPremiumCourse && onOpenPremiumCourse()}
-              className="px-5 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 shadow-sm transition-all flex items-center space-x-2"
+              className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 shadow-sm transition-all flex items-center space-x-2 cursor-pointer active:scale-95"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Premium</span>
+              <span>Premium Courses</span>
             </button>
             {isInstallable && (
               <button
                 id="hero-install-btn"
                 onClick={promptInstall}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all flex items-center space-x-2"
+                className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all flex items-center space-x-2 cursor-pointer active:scale-95"
               >
                 <Download className="w-4 h-4" />
                 <span>Install App</span>
@@ -181,36 +181,36 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {/* Quick Metrics Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
-            <span className="text-2xl font-extrabold text-blue-600 font-mono">{stats?.totalFolders ?? 18}+</span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Folders</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-5 sm:mt-8">
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-center items-center">
+            <span className="text-xl sm:text-2xl font-extrabold text-blue-600 font-mono">{stats?.totalFolders ?? 18}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Folders</span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
-            <span className="text-2xl font-extrabold text-cyan-600 font-mono">{stats?.totalFiles ?? 8}+</span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Docs</span>
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-center items-center">
+            <span className="text-xl sm:text-2xl font-extrabold text-cyan-600 font-mono">{stats?.totalFiles ?? 8}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Docs</span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
-            <span className="text-2xl font-extrabold text-emerald-600 font-mono">{stats?.totalFiles ?? 4}+</span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Guides</span>
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-center items-center">
+            <span className="text-xl sm:text-2xl font-extrabold text-emerald-600 font-mono">{stats?.totalFiles ?? 4}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Guides</span>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-center items-center">
-            <span className="text-2xl font-extrabold text-indigo-600 font-mono">{stats?.totalViews ?? 3400}+</span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">Reads</span>
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-center items-center">
+            <span className="text-xl sm:text-2xl font-extrabold text-indigo-600 font-mono">{stats?.totalViews ?? 3400}+</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Reads</span>
           </div>
         </div>
       </section>
 
       {/* QUICK BROWSE CATEGORIES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-6">
+      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Major Study Categories</h2>
+            <h2 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">Major Study Categories</h2>
             <p className="text-xs sm:text-sm text-slate-500">Select your diploma branch to explore semester folders and unit notes</p>
           </div>
           <button
             onClick={() => onNavigateBrowse(null)}
-            className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+            className="text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
             <span>View All Root Folders</span>
             <ArrowRight className="w-3.5 h-3.5" />

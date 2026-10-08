@@ -70,6 +70,15 @@ export function extractYoutubeId(url?: string): string | null {
 }
 
 /**
+ * Build standard YouTube embed URL with origin, enablejsapi, modestbranding and referrerpolicy parameters
+ */
+export function buildYouTubeEmbedUrl(ytId: string, autoplay = 1): string {
+  const origin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  const originParam = origin ? `&origin=${encodeURIComponent(origin)}` : '';
+  return `https://www.youtube.com/embed/${ytId}?autoplay=${autoplay}&rel=0&playsinline=1&controls=1&fs=1&enablejsapi=1&modestbranding=1${originParam}`;
+}
+
+/**
  * Parse Video Embed: Supports full <iframe> HTML embed code, YouTube watch URL, shorts, or direct embed URL
  */
 export function parseVideoEmbed(input?: string): { embedUrl: string; youtubeId: string | null; rawIframe?: string } {
@@ -80,7 +89,7 @@ export function parseVideoEmbed(input?: string): { embedUrl: string; youtubeId: 
   const ytId = extractYoutubeId(trimmed);
   if (ytId) {
     return {
-      embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0&playsinline=1&controls=1&fs=1`,
+      embedUrl: buildYouTubeEmbedUrl(ytId, 1),
       youtubeId: ytId
     };
   }
@@ -93,7 +102,7 @@ export function parseVideoEmbed(input?: string): { embedUrl: string; youtubeId: 
       const subYtId = extractYoutubeId(src);
       if (subYtId) {
         return {
-          embedUrl: `https://www.youtube-nocookie.com/embed/${subYtId}?autoplay=1&rel=0&playsinline=1&controls=1&fs=1`,
+          embedUrl: buildYouTubeEmbedUrl(subYtId, 1),
           youtubeId: subYtId,
           rawIframe: trimmed
         };

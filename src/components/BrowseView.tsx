@@ -211,14 +211,14 @@ export const BrowseView: React.FC<BrowseViewProps> = ({
           </div>
 
           {/* Sort & View Mode */}
-          <div className="flex items-center space-x-2 self-end sm:self-auto">
+          <div className="flex items-center justify-between sm:justify-end space-x-2 w-full sm:w-auto">
             {/* Sort */}
-            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 flex-1 sm:flex-initial">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value as SortOption)}
-                className="text-xs font-semibold text-slate-700 bg-transparent border-none focus:outline-none cursor-pointer"
+                className="text-xs font-semibold text-slate-700 bg-transparent border-none focus:outline-none cursor-pointer w-full"
               >
                 <option value="name-asc">Name (A-Z)</option>
                 <option value="name-desc">Name (Z-A)</option>
@@ -230,7 +230,7 @@ export const BrowseView: React.FC<BrowseViewProps> = ({
             </div>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded-lg transition-all ${

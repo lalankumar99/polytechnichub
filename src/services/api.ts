@@ -116,6 +116,37 @@ export const api = {
     });
   },
 
+  async toggleCourseLive(id: string, isLive?: boolean): Promise<any> {
+    const res = await fetch(`/api/admin/courses/${id}/toggle-live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(isLive !== undefined ? { isLive } : {})
+    });
+    const data = await safeJson(res, 'Failed to toggle live state');
+    return data.course;
+  },
+
+  // Live Chat API
+  async getLiveChatMessages(courseId: string): Promise<any[]> {
+    try {
+      const res = await fetch(`/api/live/chat/${courseId}`);
+      const data = await safeJson(res, 'Failed to fetch live chat');
+      return data.messages || [];
+    } catch (err) {
+      return [];
+    }
+  },
+
+  async sendLiveChatMessage(courseId: string, msgData: { userName: string; userRole?: string; message: string; userId?: string }): Promise<any> {
+    const res = await fetch(`/api/live/chat/${courseId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msgData)
+    });
+    const data = await safeJson(res, 'Failed to send live message');
+    return data.message;
+  },
+
   // Premium Items
   async getPremiumItems(courseId: string): Promise<any[]> {
     try {

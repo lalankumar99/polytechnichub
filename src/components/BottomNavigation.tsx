@@ -15,65 +15,77 @@ export const BottomNavigation: React.FC<BottomNavProps> = ({
   isAdmin
 }) => {
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-200 pb-safe shadow-[0_-4px_15px_rgba(0,0,0,0.02)]">
-      <nav className="flex items-center justify-around h-16 px-2">
+    <div 
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.06)] touch-manipulation select-none"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+    >
+      <nav className="flex items-center justify-between h-14 sm:h-16 px-1 max-w-md mx-auto">
         <button
           onClick={() => onNavigate('home')}
-          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
-            currentView === 'home' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full transition-colors cursor-pointer active:scale-95 ${
+            currentView === 'home' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
+          aria-label="Home"
         >
-          <Home className={`w-5 h-5 ${currentView === 'home' ? 'fill-blue-100/50' : ''}`} />
-          <span className="text-[10px] font-semibold">Home</span>
+          <Home className={`w-5 h-5 ${currentView === 'home' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          <span className="text-[10px] tracking-tight truncate mt-0.5">Home</span>
         </button>
 
         <button
           onClick={() => onNavigate('browse')}
-          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
-            currentView === 'browse' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full transition-colors cursor-pointer active:scale-95 ${
+            currentView === 'browse' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
+          aria-label="Library"
         >
-          <FolderTree className={`w-5 h-5 ${currentView === 'browse' ? 'fill-blue-100/50' : ''}`} />
-          <span className="text-[10px] font-semibold">Library</span>
+          <FolderTree className={`w-5 h-5 ${currentView === 'browse' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          <span className="text-[10px] tracking-tight truncate mt-0.5">Library</span>
         </button>
 
         <button
           onClick={() => onNavigate('premium-courses')}
-          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
-            currentView === 'premium-courses' || currentView === 'premium' ? 'text-amber-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full transition-colors cursor-pointer active:scale-95 ${
+            currentView === 'premium-courses' || currentView === 'premium' ? 'text-amber-600 font-extrabold' : 'text-slate-500 hover:text-slate-800'
           }`}
+          aria-label="Premium Courses"
         >
-          <Sparkles className={`w-5 h-5 ${currentView === 'premium-courses' ? 'text-amber-500 fill-amber-100/50' : ''}`} />
-          <span className="text-[10px] font-semibold">Premium</span>
+          <div className="relative">
+            <Sparkles className={`w-5 h-5 ${currentView === 'premium-courses' || currentView === 'premium' ? 'text-amber-500 fill-amber-400/40 stroke-[2.5]' : 'stroke-[1.8]'}`} />
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          </div>
+          <span className="text-[10px] tracking-tight truncate mt-0.5">Courses</span>
         </button>
 
         <button
           onClick={onOpenSearch}
-          className="flex flex-col items-center justify-center w-14 h-full space-y-1 text-slate-500 hover:text-slate-900 transition-colors"
+          className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full text-slate-500 hover:text-slate-800 transition-colors cursor-pointer active:scale-95"
+          aria-label="Search"
         >
-          <Search className="w-5 h-5" />
-          <span className="text-[10px] font-semibold">Search</span>
+          <Search className="w-5 h-5 stroke-[1.8]" />
+          <span className="text-[10px] tracking-tight truncate mt-0.5">Search</span>
         </button>
 
         <button
           onClick={() => onNavigate('about')}
-          className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
-            currentView === 'about' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full transition-colors cursor-pointer active:scale-95 ${
+            currentView === 'about' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'
           }`}
+          aria-label="About"
         >
-          <User className={`w-5 h-5 ${currentView === 'about' ? 'fill-blue-100/50' : ''}`} />
-          <span className="text-[10px] font-semibold">About</span>
+          <User className={`w-5 h-5 ${currentView === 'about' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          <span className="text-[10px] tracking-tight truncate mt-0.5">About</span>
         </button>
 
         {isAdmin && (
           <button
             onClick={() => onNavigate('admin')}
-            className={`flex flex-col items-center justify-center w-14 h-full space-y-1 transition-colors ${
-              currentView === 'admin' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 h-full transition-colors cursor-pointer active:scale-95 ${
+              currentView === 'admin' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-800'
             }`}
+            aria-label="Admin Dashboard"
           >
-            <Shield className={`w-5 h-5 ${currentView === 'admin' ? 'fill-blue-100/50' : ''}`} />
-            <span className="text-[10px] font-semibold">Admin</span>
+            <Shield className={`w-5 h-5 ${currentView === 'admin' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+            <span className="text-[10px] tracking-tight truncate mt-0.5">Admin</span>
           </button>
         )}
       </nav>

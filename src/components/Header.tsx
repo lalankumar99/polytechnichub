@@ -10,7 +10,8 @@ import {
   FileText,
   Sparkles
 } from 'lucide-react';
-import { AdminUser } from '../types';
+import { AdminUser, PremiumCourse } from '../types';
+import { StudentNotificationCenter } from './StudentNotificationCenter';
 
 interface HeaderProps {
   currentView: 'home' | 'browse' | 'admin' | 'about' | 'premium' | 'premium-courses';
@@ -22,6 +23,8 @@ interface HeaderProps {
   onOpenSearch: () => void;
   onLogout: () => void;
   onOpenAdminAddDrivePdf?: () => void;
+  courses?: PremiumCourse[];
+  onJoinLiveCourse?: (course: PremiumCourse) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,22 +36,24 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   premiumUser,
   onPremiumLogout,
-  onOpenAdminAddDrivePdf
+  onOpenAdminAddDrivePdf,
+  courses = [],
+  onJoinLiveCourse
 }) => {
   return (
-    <header id="polytechnic-header" className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 text-slate-900 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+    <header id="polytechnic-header" className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-slate-200 text-slate-900 shadow-xs pt-safe">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => onNavigate('home')}>
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
+          <div className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer min-w-0 shrink" onClick={() => onNavigate('home')}>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shrink-0">
               <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-extrabold text-base sm:text-xl tracking-tight text-slate-900">Polytechnic Hub</span>
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 rounded-md">PRO</span>
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1 sm:space-x-1.5">
+                <span className="font-extrabold text-sm sm:text-xl tracking-tight text-slate-900 truncate">Polytechnic Hub</span>
+                <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-blue-100 text-blue-700 rounded-md shrink-0">PRO</span>
               </div>
             </div>
           </div>
@@ -114,6 +119,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action / Admin Authentication & Student Profile */}
           <div className="flex items-center space-x-2">
+            {/* Student Notification Center Bell */}
+            <StudentNotificationCenter
+              courses={courses}
+              onOpenCourse={(c) => {
+                if (onJoinLiveCourse) onJoinLiveCourse(c);
+                else onNavigate('premium-courses');
+              }}
+              user={premiumUser}
+            />
+
             {adminUser ? (
               <div className="hidden md:flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-xl p-1 pl-3">
                 <div className="flex items-center space-x-1.5">

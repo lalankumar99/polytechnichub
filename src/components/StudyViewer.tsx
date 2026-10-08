@@ -190,8 +190,9 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
   // IF VIDEO: RENDER ONLY FULLSCREEN LANDSCAPE VIDEO WITH TOP BACK ARROW & BOTTOM FULLSCREEN
   if (isVideo) {
     let srcUrl = '';
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
     if (hasYtId) {
-      srcUrl = `https://www.youtube-nocookie.com/embed/${hasYtId}?autoplay=1&rel=0&playsinline=1&controls=1&fs=1`;
+      srcUrl = `https://www.youtube-nocookie.com/embed/${hasYtId}?autoplay=1&rel=0&playsinline=1&controls=1&fs=1${currentOrigin ? `&origin=${encodeURIComponent(currentOrigin)}` : ''}`;
     } else {
       // Check fileUrl and content
       const urlEmbed = file.fileUrl && !file.fileUrl.startsWith('/api/') && !file.fileUrl.startsWith('/uploads/') 
@@ -241,7 +242,7 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
             title={file.videoTitle || file.name}
             className="absolute inset-0 w-full h-full border-0 m-0 p-0 block"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
+            referrerPolicy="no-referrer-when-downgrade"
             allowFullScreen
           />
 
@@ -264,20 +265,45 @@ export const StudyViewer: React.FC<StudyViewerProps> = ({
             </div>
           )}
 
-          {/* TOP LEFT BACK ARROW (ICON ONLY) */}
-          <button
-            onClick={handleVideoBack}
-            className="absolute top-3 left-3 z-[10000000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all active:scale-95 cursor-pointer border border-white/20"
-            aria-label="Back"
-            title="Back"
+          {/* TOP LEFT BACK ARROW & YOUTUBE DIRECT LINK */}
+          <div 
+            className="absolute top-3 left-3 z-[10000000] flex items-center space-x-2"
+            style={{ 
+              top: 'max(env(safe-area-inset-top, 0px), 12px)', 
+              left: 'max(env(safe-area-inset-left, 0px), 12px)' 
+            }}
           >
-            <ArrowLeft className="w-4 h-4 text-white" />
-          </button>
+            <button
+              onClick={handleVideoBack}
+              className="p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all active:scale-95 cursor-pointer border border-white/20"
+              aria-label="Back"
+              title="Back"
+            >
+              <ArrowLeft className="w-4 h-4 text-white" />
+            </button>
+
+            {hasYtId && (
+              <a
+                href={`https://www.youtube.com/watch?v=${hasYtId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-full bg-red-600/80 hover:bg-red-600 text-white text-[11px] font-bold backdrop-blur-md shadow-2xl transition-all flex items-center space-x-1.5 border border-white/20 active:scale-95"
+                title="Watch on YouTube if embed is disabled by video owner"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Watch on YouTube</span>
+              </a>
+            )}
+          </div>
 
           {/* BOTTOM RIGHT FULLSCREEN TOGGLE (BRACKET ICON ONLY - NO TEXT) */}
           <button
             onClick={handleFullscreenToggle}
             className="absolute bottom-3 right-3 z-[10000000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all active:scale-95 cursor-pointer border border-white/20"
+            style={{ 
+              bottom: 'max(env(safe-area-inset-bottom, 0px), 12px)', 
+              right: 'max(env(safe-area-inset-right, 0px), 12px)' 
+            }}
             aria-label="Toggle Fullscreen"
             title="Fullscreen"
           >

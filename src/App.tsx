@@ -3,6 +3,15 @@ import { PremiumPortal } from './components/PremiumPortal';
 import { PremiumCoursesView } from './components/PremiumCoursesView';
 import { PremiumCourseView } from './components/PremiumCourseView';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { LiveClassNotificationBanner } from './components/LiveClassNotificationBanner';
+import { LiveClassToast } from './components/LiveClassToast';
+import { 
+  playNotificationChime, 
+  sendBrowserNotification, 
+  hasNotifiedForLiveStream, 
+  markLiveStreamAsNotified,
+  clearLiveStreamNotificationState
+} from './utils/notificationService';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -46,6 +55,8 @@ export default function App() {
   const [showDriveReaderModal, setShowDriveReaderModal] = useState<boolean>(false);
   const [adminTriggerAddDrivePdf, setAdminTriggerAddDrivePdf] = useState<boolean>(false);
   const [activeDriveSource, setActiveDriveSource] = useState<{ source: string; title?: string } | null>(null);
+  const [allCourses, setAllCourses] = useState<PremiumCourse[]>([]);
+  const [activeToastCourse, setActiveToastCourse] = useState<PremiumCourse | null>(null);
   const [premiumUser, setPremiumUser] = useState<any>(() => {
     try {
       const stored = localStorage.getItem('polytechnic_premium_user');
@@ -87,18 +98,61 @@ export default function App() {
   // Load public data
   const loadPublicData = useCallback(async () => {
     try {
-      const [items, stats] = await Promise.all([
-        api.getPublicTree(),
-        api.getPublicStats()
+      const [items, stats, courses] = await Promise.all([
+        api.getPublicTree().catch(() => []),
+        api.getPublicStats().catch(() => null),
+        api.getPremiumCourses().catch(() => [])
       ]);
       setPublicItems(items);
       setPublicStats(stats);
+      setAllCourses(courses || []);
     } catch (err) {
       console.error('Error fetching public library:', err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Poll courses in background so all students receive live class notifications in real-time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.getPremiumCourses().then(courses => {
+        if (courses) setAllCourses(courses);
+      }).catch(() => {});
+    }, 12000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleJoinLiveCourse = (course: PremiumCourse) => {
+    setSelectedPremiumCourse(course);
+    setCurrentView('premium-courses');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Student Live Alerts: Plays audio chime, dispatches browser notification, and triggers floating toast
+  useEffect(() => {
+    if (!allCourses || allCourses.length === 0) return;
+
+    allCourses.forEach(course => {
+      if (course.isLive && course.liveYoutubeUrl) {
+        if (!hasNotifiedForLiveStream(course.id)) {
+          markLiveStreamAsNotified(course.id);
+          // 1. Melodic sound chime
+          playNotificationChime();
+          // 2. Real browser / device notification
+          sendBrowserNotification(`🔴 LIVE CLASS: ${course.name}`, {
+            body: course.liveTopic ? `Topic: ${course.liveTopic}. Tap to join the live stream!` : 'Live class is now broadcasting! Tap to join.',
+            tag: `live-${course.id}`,
+            data: { courseId: course.id }
+          });
+          // 3. Floating on-screen toast
+          setActiveToastCourse(course);
+        }
+      } else {
+        clearLiveStreamNotificationState(course.id);
+      }
+    });
+  }, [allCourses]);
 
   useEffect(() => {
     loadPublicData();
@@ -244,7 +298,7 @@ export default function App() {
   }, [publicItems, premiumUser, adminUser]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-cyan-500/30 selection:text-slate-900">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-cyan-500/30 selection:text-slate-900 w-full overflow-x-hidden max-w-full">
       
       {/* Offline Status Monitor & Popup */}
       <OfflineIndicator onRetryConnection={loadPublicData} />
@@ -258,6 +312,8 @@ export default function App() {
         onOpenSearch={() => setShowSearchModal(true)}
         onLogout={handleLogout}
         premiumUser={premiumUser}
+        courses={allCourses}
+        onJoinLiveCourse={handleJoinLiveCourse}
         onPremiumLogout={() => {
           localStorage.removeItem('polytechnic_premium_user');
           setPremiumUser(null);
@@ -268,8 +324,15 @@ export default function App() {
         }}
       />
 
+      {/* Global Live Class Announcement Notification for All Students */}
+      <LiveClassNotificationBanner
+        courses={allCourses}
+        onJoinLiveCourse={handleJoinLiveCourse}
+        user={premiumUser}
+      />
+
       {/* Main Content Area */}
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1 pb-24 md:pb-0">
         {currentView === 'home' && (
           <HomePage
             onNavigateBrowse={(folderId) => handleNavigate('browse', folderId)}
@@ -308,7 +371,7 @@ export default function App() {
         {(currentView === 'premium' || currentView === 'premium-courses') && (
           selectedPremiumCourse ? (
             <PremiumCourseView
-              course={selectedPremiumCourse}
+              course={allCourses.find(c => c.id === selectedPremiumCourse.id) || selectedPremiumCourse}
               onBack={() => setSelectedPremiumCourse(null)}
               user={premiumUser}
               isAdmin={!!adminUser}
@@ -414,12 +477,26 @@ export default function App() {
         }}
       />
 
-      <BottomNavigation
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        onOpenSearch={() => setShowSearchModal(true)}
-        isAdmin={!!adminUser}
-      />
+      {/* Floating Live Class Toast Alert */}
+      {activeToastCourse && (
+        <LiveClassToast
+          course={activeToastCourse}
+          onJoin={() => {
+            handleJoinLiveCourse(activeToastCourse);
+            setActiveToastCourse(null);
+          }}
+          onDismiss={() => setActiveToastCourse(null)}
+        />
+      )}
+
+      {!activeViewingFile && !activeDriveSource && (
+        <BottomNavigation
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          onOpenSearch={() => setShowSearchModal(true)}
+          isAdmin={!!adminUser}
+        />
+      )}
 
     </div>
   );

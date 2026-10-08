@@ -190,7 +190,11 @@ export const DrivePdfViewer: React.FC<DrivePdfViewerProps> = ({
               handleExit();
             }
           }}
-          className="absolute top-2 left-2 z-[100000000] p-2 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md shadow-2xl transition-all cursor-pointer border border-white/20 active:scale-90"
+          className="absolute top-3 left-3 z-[100000000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md shadow-2xl transition-all cursor-pointer border border-white/20 active:scale-90"
+          style={{ 
+            top: 'max(env(safe-area-inset-top, 0px), 12px)', 
+            left: 'max(env(safe-area-inset-left, 0px), 12px)' 
+          }}
           title="Back / Exit Full Screen"
           aria-label="Back"
         >

@@ -22,9 +22,18 @@ import {
   BookOpen,
   Code,
   Upload,
-  FileCode
+  FileCode,
+  Radio,
+  Tv,
+  Clock,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  AlertCircle
 } from 'lucide-react';
 import { PremiumCourse, PremiumItem } from '../types';
+import { extractYoutubeId } from '../utils/formatters';
 
 export const AdminPremiumManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'courses'>('users');
@@ -44,6 +53,8 @@ export const AdminPremiumManager: React.FC = () => {
   // Course Edit State
   const [editingCourse, setEditingCourse] = useState<Partial<PremiumCourse> | null>(null);
   const [isSavingCourse, setIsSavingCourse] = useState(false);
+  const [showLiveGuide, setShowLiveGuide] = useState(false);
+  const [previewEmbedId, setPreviewEmbedId] = useState<string | null>(null);
 
   // Course Content Management State
   const [managingCourse, setManagingCourse] = useState<PremiumCourse | null>(null);
@@ -228,6 +239,20 @@ export const AdminPremiumManager: React.FC = () => {
       loadData();
     } catch (err: any) {
       alert('Error deleting course: ' + err.message);
+    }
+  };
+
+  const handleToggleCourseLive = async (course: PremiumCourse) => {
+    const nextStatus = !course.isLive;
+    if (nextStatus && !course.liveYoutubeUrl) {
+      alert('Please add a YouTube Live Stream URL or Video ID to this course first (click Edit).');
+      return;
+    }
+    try {
+      await api.toggleCourseLive(course.id, nextStatus);
+      setCourses(prev => prev.map(c => c.id === course.id ? { ...c, isLive: nextStatus } : c));
+    } catch (err: any) {
+      alert('Error updating live status: ' + err.message);
     }
   };
 
@@ -823,32 +848,45 @@ export const AdminPremiumManager: React.FC = () => {
 
         /* ---------------- ALL PREMIUM COURSES ---------------- */
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-extrabold text-base text-slate-900">Courses Catalog</h3>
               <p className="text-xs text-slate-500">Create courses and manage study materials inside each course.</p>
             </div>
             <button 
               onClick={() => setEditingCourse({ status: 'published', price: 999 })}
-              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition cursor-pointer"
+              className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition cursor-pointer self-start sm:self-auto w-full sm:w-auto active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>+ Create New Course</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {courses.map(course => (
               <div key={course.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group hover:shadow-md transition-all">
-                {course.bannerUrl ? (
-                  <div className="h-40 w-full bg-slate-100 relative overflow-hidden">
+                <div className="aspect-[16/9] w-full bg-slate-100 relative overflow-hidden">
+                  {course.bannerUrl ? (
                     <img src={course.bannerUrl} alt={course.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  </div>
-                ) : (
-                  <div className="h-40 w-full bg-indigo-50 flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-indigo-300" />
-                  </div>
-                )}
+                  ) : (
+                    <div className="w-full h-full bg-indigo-50 flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-indigo-300" />
+                    </div>
+                  )}
+
+                  {/* Pulsing Live Badge if live now */}
+                  {course.isLive ? (
+                    <div className="absolute top-3 left-3 bg-red-600 text-white font-black text-[10px] uppercase px-2.5 py-1 rounded-lg shadow-md flex items-center space-x-1.5 animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-white shadow-xs" />
+                      <span>LIVE NOW</span>
+                    </div>
+                  ) : course.liveScheduledTime ? (
+                    <div className="absolute top-3 left-3 bg-slate-900/85 backdrop-blur text-slate-200 font-bold text-[10px] px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      <span>{course.liveScheduledTime}</span>
+                    </div>
+                  ) : null}
+                </div>
                 
                 <div className="p-5 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-2">
@@ -857,8 +895,38 @@ export const AdminPremiumManager: React.FC = () => {
                   </div>
                   
                   <h3 className="font-extrabold text-slate-900 text-base leading-tight mb-2">{course.name}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 mb-4 flex-1">{course.description}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2 mb-3 flex-1">{course.description}</p>
                   
+                  {/* YouTube Live Stream Controls Bar on Card */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs mb-3">
+                    <div className="flex items-center space-x-2 min-w-0 pr-2">
+                      <Radio className={`w-4 h-4 shrink-0 ${course.isLive ? 'text-red-600 animate-pulse' : 'text-slate-400'}`} />
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-[11px] truncate">
+                          {course.isLive 
+                            ? 'Broadcast: Live Now 🔴' 
+                            : (course.liveYoutubeUrl ? 'Stream Configured' : 'No Live Stream Set')}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">
+                          {course.liveTopic || (course.liveScheduledTime ? `Sched: ${course.liveScheduledTime}` : 'Click edit to set stream')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCourseLive(course)}
+                      className={`px-2.5 py-1 rounded-lg font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
+                        course.isLive 
+                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs' 
+                          : 'bg-slate-200 hover:bg-emerald-600 hover:text-white text-slate-700'
+                      }`}
+                      title={course.isLive ? 'End Live Broadcast' : 'Start Live Broadcast'}
+                    >
+                      {course.isLive ? 'End Live' : 'Go Live'}
+                    </button>
+                  </div>
+
                   {/* Actions inside course card */}
                   <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
                     <button
@@ -873,7 +941,7 @@ export const AdminPremiumManager: React.FC = () => {
                       <button
                         onClick={() => setEditingCourse(course)}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
-                        title="Edit Course Details"
+                        title="Edit Course Details & Live Stream"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -1129,7 +1197,9 @@ export const AdminPremiumManager: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Banner Image URL (Optional)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Banner Image URL (Standard 16:9 Aspect Ratio)
+                </label>
                 <input 
                   type="url" 
                   value={editingCourse.bannerUrl || ''} 
@@ -1137,6 +1207,14 @@ export const AdminPremiumManager: React.FC = () => {
                   className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none" 
                   placeholder="https://example.com/banner.jpg"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Recommended Aspect Ratio: <strong>16:9</strong> (e.g. <strong>1280 × 720 px</strong> or <strong>1920 × 1080 px</strong>). Fits 100% perfectly without any cropping.
+                </p>
+                {editingCourse.bannerUrl && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 aspect-[16/9] w-48 bg-slate-100">
+                    <img src={editingCourse.bannerUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1148,6 +1226,175 @@ export const AdminPremiumManager: React.FC = () => {
                   className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
                   placeholder="Comprehensive theory notes, handwritten numericals, and masterclass videos..."
                 />
+              </div>
+
+              {/* ---------------- YOUTUBE UNLISTED LIVE CLASSES SECTION ---------------- */}
+              <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-4 border border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded-lg bg-red-600/20 text-red-400 flex items-center justify-center">
+                      <Radio className="w-4 h-4 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-white">YouTube Unlisted Live Classes</h4>
+                      <p className="text-[10px] text-slate-400">Stream private unlisted lectures directly to enrolled students</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLiveGuide(prev => !prev)}
+                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 cursor-pointer"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    <span>Setup Guide</span>
+                    {showLiveGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+
+                {/* Collapsible Setup Guide */}
+                {showLiveGuide && (
+                  <div className="p-3.5 bg-slate-950/90 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-2.5 leading-relaxed animate-fade-in">
+                    <div className="flex items-center space-x-1.5 text-amber-400 font-extrabold">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>YouTube Studio आवश्यक सेटिंग्स ('Playback disabled' एरर से बचने के लिए):</span>
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
+                      <li><a href="https://studio.youtube.com" target="_blank" rel="noreferrer" className="text-indigo-400 underline font-semibold">YouTube Studio</a> खोलें &rarr; <strong>"Go Live"</strong> या <strong>Content &rarr; Live</strong> पर जाएँ।</li>
+                      <li>Stream Details में <strong>Visibility</strong> को <strong className="text-white">"Unlisted"</strong> रखें (Private वीडियो external sites पर ब्लॉक होते हैं)।</li>
+                      <li>नीचे <strong>"Show More"</strong> पर क्लिक करें और <strong>License and distribution</strong> में <strong className="text-emerald-400">"Allow embedding" (एम्बेड करने की अनुमति दें)</strong> चेकबॉक्स को अवश्य टिक (ON) करें।</li>
+                      <li><strong>Age Restriction:</strong> "No, it's not made for kids" और "Don't restrict my video to viewers over 18" सेट रखें।</li>
+                      <li>Stream URL या 11-अक्षरों का Video ID नीचे पेस्ट करें और "Test Playback" बटन दबाकर जांचें।</li>
+                      <li>क्लास शुरू होने पर <strong className="text-emerald-400">"Is Live Now"</strong> को ON करें ताकि सभी छात्रों को तुरंत नोटिफिकेशन और Live Badge मिल सके!</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* 1. Live Stream YouTube URL or Video ID */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-200">
+                      Live Stream YouTube URL or Video ID
+                    </label>
+                    {editingCourse.liveYoutubeUrl && extractYoutubeId(editingCourse.liveYoutubeUrl) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = extractYoutubeId(editingCourse.liveYoutubeUrl!);
+                          setPreviewEmbedId(previewEmbedId === id ? null : id);
+                        }}
+                        className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Play className="w-3 h-3" />
+                        <span>{previewEmbedId ? 'Hide Test Player' : 'Test Playback Embed'}</span>
+                      </button>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    value={editingCourse.liveYoutubeUrl || ''} 
+                    onChange={e => setEditingCourse({...editingCourse, liveYoutubeUrl: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 font-mono focus:ring-2 focus:ring-red-500 outline-none" 
+                    placeholder="https://youtube.com/live/VIDEO_ID or watch?v=... or 11-char ID"
+                  />
+                  {editingCourse.liveYoutubeUrl && (
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                      {extractYoutubeId(editingCourse.liveYoutubeUrl) ? (
+                        <span className="text-emerald-400 font-mono font-bold flex items-center space-x-1">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Detected Video ID: {extractYoutubeId(editingCourse.liveYoutubeUrl)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-amber-400 font-medium">Please enter a valid YouTube video link or 11-char ID</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Test Embed Preview Container */}
+                  {previewEmbedId && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-slate-300 font-bold">
+                        <span>Preview Test Player (Origin: {typeof window !== 'undefined' ? window.location.hostname : ''}):</span>
+                        <a 
+                          href={`https://www.youtube.com/watch?v=${previewEmbedId}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-red-400 hover:text-red-300 flex items-center space-x-1 text-[11px]"
+                        >
+                          <span>Open on YouTube</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                      <div className="aspect-video w-full max-w-sm mx-auto rounded-lg overflow-hidden border border-slate-800 bg-black">
+                        <iframe
+                          src={`https://www.youtube.com/embed/${previewEmbedId}?autoplay=0&origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
+                          title="Admin Test Embed"
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          allowFullScreen
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 text-center">
+                        अगर यहाँ <em>'Playback on other websites has been disabled'</em> दिखे, तो YouTube Studio में जाकर "Allow embedding" चेक करें।
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Is Live Now Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      "Is Live Now" Status
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      When enabled, a pulsing LIVE NOW badge is shown on student dashboard & course cards.
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingCourse({...editingCourse, isLive: !editingCourse.isLive})}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm ${
+                      editingCourse.isLive 
+                        ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' 
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${editingCourse.isLive ? 'bg-white' : 'bg-slate-500'}`} />
+                    <span>{editingCourse.isLive ? 'Active (LIVE)' : 'Inactive'}</span>
+                  </button>
+                </div>
+
+                {/* 3. Live Scheduled Time & Topic */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      Live Scheduled Time (Optional)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editingCourse.liveScheduledTime || ''} 
+                      onChange={e => setEditingCourse({...editingCourse, liveScheduledTime: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                      placeholder="e.g. Live on Today at 6:00 PM"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      Live Class Topic / Description
+                    </label>
+                    <input 
+                      type="text" 
+                      value={editingCourse.liveTopic || ''} 
+                      onChange={e => setEditingCourse({...editingCourse, liveTopic: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                      placeholder="e.g. Unit 3 Numerical Masterclass"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
